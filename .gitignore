@@ -1,0 +1,9 @@
+# Virtual Environment
+venv/
+**/__pycache__/
+*.pyc
+
+# Distribution / packaging
+build/
+dist/
+*.egg-info/
