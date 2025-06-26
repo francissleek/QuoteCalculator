@@ -1,0 +1,210 @@
+I want a calculator where:
+
+I enter:
+lenght in feet	
+length in inches	
+width in feet 	
+width in inches	
+numer of peices	
+number of yearly pieces
+
+SQ' per piece
+Formula:
+(((Width in FEET * 12) + Width in INCHES) * ((Height in FEET * 12) + Height in INCHES)) / 144
+
+Total Sq'
+Formula:
+EACH order / QTY * SQ' per piece
+
+Overall discount:
+Preferred: $7.00
+Corporate: $6.50
+Wholesale: $5.00
+
+It will calcualte for:
+Total Sq' for each entry, we will anme it SQ' per piece
+and total the Total Sq' for all entries, we will name it TOTAL SQ' IN ORDER
+
+after getting the TOTAL SQ' IN ORDER and the SQ' per piece
+I want to select the appropriate item for these list
+
+list 1:
+we will call it 'Sides computation', this is based from SQ' per piece on each entry
+example: if SQ' per piece is from 1sq' - 0.5sq' then the selected value is 1.25
+
+STANDARD OVER 1sq' = 1.00
+SMALL Between 1sq' - 0.5sq' = 1.25
+SMALL BETWEEN 0.5 - .25 sq' /peice = 1.65
+SMALLER BETWEEN 0.25 - .1 sq' /peice = 1.75
+SMALLER BETWEEN 0.1 - .05 sq' /peice = 2.50
+SMALLEST UNDER 0.05 sq' /peice = 3.00
+NO PRINT = 0.65
+DOUBLE SIDED Over 1 SQ' = 1.60
+DOUBLE SIDED between 1sq' - 0.5sq' per peice = 2.25
+DOUBLE SIDED under 0.5 - .25 sq' /peice = 2.75
+DOUBLE SIDED under 0.25 - .1 sq' /peice = 3.50
+DOUBLE SIDED under 0.1 - .05 sq' /peice = 3.75
+DOUBLE SIDED under 0.05 sq' /peice = 4.00
+
+list 2:
+we will call it 'Specialty Finishing', this is based from the type and SQ' per piece on each entry
+example: if selected type is banner and SQ' per piece is under 50 sq per piece then select $1.00
+
+Type: Banner/Mesh
+UNDER 50 sq' per piece - POCKET or HEMM AND GROMMETS EVERY 2' = 1.32
+50 sq' - 100sq' per piece - POCKET or HEMM AND GROMMETS EVERY 2' = 1.00
+100sq' - 250sq' per piece- POCKET or HEMM AND GROMMETS EVERY 2' = 0.65
+200 sq' - 500sq' per piece- POCKET or HEMM AND GROMMETS EVERY 2' = 0.42
+OVER 500 sq' per piece- POCKET or HEMM AND GROMMETS EVERY 2' = 0.20
+
+Type: Additional Laminate/sq' = 1.80
+textured floor/graffiti laminte/Dry Erase = 4.00
+Add Print on NO PRINT = 3.75
+ADD White Ink = 0.62
+IJ 35 Vinyl with 200G - applied = 3.79
+IJ 180CV3 with 8518 = 5.75
+Meta Mark - Reflective Applied including 200G laminate = 6.25
+3M IJ680 - Reflective Applied including 8518 laminate = 7.25
+Wet or Dry mount on Acrylic = 8.00
+
+list 3:
+we will call it 'SQ' Discount', this is based from TOTAL SQ' IN ORDER
+example: if TOTAL SQ' IN ORDER is 80 sq' then the selected value will be 0.00%
+example 2: if TOTAL SQ' IN ORDER is exactly 3,060 sq' then value will be 20.20%
+
+normal discount - 3,060.00 sq'
+20.20%
+
+50 - 100 sq'
+0.00%
+
+100 - 200 sq'
+3.00% (Preferred)
+3.10% (Corporate)
+3.20% (Wholesale)
+
+200 - 300 sq'
+5.00% (Preferred)
+5.10% (Corporate)
+5.20% (Wholesale)
+
+300 - 500 sq'
+10.00% (Preferred)
+10.10% (Corporate)
+8.20% (Wholesale)
+
+500 - 1000 sq'
+15.00% (Preferred)
+15.10% (Corporate)
+10.20% (Wholesale)
+
+1K - 3K sq'
+22.00% (Preferred)
+22.10% (Corporate)
+15.20% (Wholesale)
+
+3K - 5K sq'
+25.00% (Preferred)
+25.10% (Corporate)
+25.20% (Wholesale)
+
+5K - 10K sq'
+30.00% (Preferred)
+30.10% (Corporate)
+25.20% (Wholesale)
+
+10K+ sq'
+35.00% (Preferred)
+35.10% (Corporate)
+30.20%( Wholesale)
+
+list 4:
+we will call it 'Print adjustment', this is based from TOTAL SQ' IN ORDER
+example: if TOTAL SQ' IN ORDER is 80 sq' then the selected value will be 5.10%
+example 2: if the selected item is weekend hour rush then value will be 15.00%
+
+Print adjustment
+
+no adjustment = 0%
+retail = 10.10%
+Promo = 5%
+OT 24 hour rush = 25.00%
+weekend hour rush = 15.00%
+Charitable = 15%
+Commodity discount 50 - 100 sq' = 5.10%
+100 - 200 sq' = 10.00%
+200 - 300 sq' = 15.00%
+300 - 500 SQ' = 17.00%
+500 - 1000 sq' = 20.00%
+1K - 3Ksq' = 22.00%
+3K-5K sq' = 23.00%
+5K - 10K sq' = 25.00%
+10k+ sq' = 27.00%
+
+list 5:
+we will call it 'Cut Cost', this is an independent list , user can just select whatever they want here
+
+NO CUT = $0.00
+tiling cut = $0
+
+Rigid Blade cut:
+
+Less than 5 cuts per sheet = $0
+5 to 10 cuts per sheet = $0.25
+10+ cuts per sheet over 6" = $0.45
+Less than 5 cuts per sheet = $0.5
+Up to 10 cuts per sheet = $0.75
+10+ cuts per sheet over 6 = $1.25
+
++ 3 object - Kiss/Rigid cut:
+
+Perimeter square (don't charge for big sheets or tiling cuts) = $0.20
+Simple Shape - Circle/Triangle/bubble cut = $0.28
+Medium letter shape and interior = $0.61
+Complex shape and interiors = $1.82
+
+3" - 1" OBJECT Kiss/Rigid cut:
+
+Simple Perimeter 3"-1" = $0.50
+Kiss/Rigid simple Shape 3"-1" = $0.66
+medium letter shape and interior 3"-1" = $1.05
+complex shape and interiors 3"-1" = $2.15
+
+UNDER 1" Kiss/Rigid:
+
+Perimeter simple = $0.55
+simple Shape = $0.94
+medium letter shape and interior = $1.93
+complex shape and interiors = $3.14
+
+ROUTER Over 3" object:
+
+perimeter simple = $2.75
+simple shape = $3.85
+medium letter = $4.24
+complex = $7.15
+
+ROUTER 3" - 1" OBJECT ROUTER:
+
+simple perimeter = $4.40
+simple shape = $6.16
+medium letter = $6.78
+complex = $8.50
+
+UNDER 1" ROUTER:
+
+simple perimeter = $6.05
+Router simple shape = $5.50
+router medium letter = $7.50
+router complex = $9.75
+
+list 6:
+we will call it 'Multpiles', this depends on the number of entries:
+
+1 entry = 1
+2 entries = 1.5
+3 entries = 2
+4 entries = 3
+5 to 10 entries = 5
+10 - 20 entries = 8
+20 or more entries  = 100000
