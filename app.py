@@ -11,17 +11,19 @@ st.set_page_config(layout="wide", page_title="Universal Quote Calculator")
 st.title("Universal Quote Calculator")
 
 def load_config(file_path='config.json'):
+    config_data = None
     if hasattr(st, 'secrets') and 'config' in st.secrets:
         config_data = st.secrets['config']
-    if isinstance(config_data, str):  # If TOML loads it as a string
-        config_data = json.loads(config_data)
+        if isinstance(config_data, str):
+            config_data = json.loads(config_data)
     else:
         with open(file_path, 'r') as f:
             config_data = json.load(f)
-        # JSON loads dictionary keys as strings, so we must convert keys back to integers for tiers
-        config_data['VOLUME_DISCOUNT_TIERS'] = {int(k): v for k, v in config_data['VOLUME_DISCOUNT_TIERS'].items()}
-        config_data['PRINT_ADJUSTMENT_COMMODITY'] = {int(k): v for k, v in config_data['PRINT_ADJUSTMENT_COMMODITY'].items()}
-        config_data['MULTIPLES_MAP'] = {int(k): v for k, v in config_data['MULTIPLES_MAP'].items()}
+
+    # Always convert keys to int for these fields
+    config_data['VOLUME_DISCOUNT_TIERS'] = {int(k): v for k, v in config_data['VOLUME_DISCOUNT_TIERS'].items()}
+    config_data['PRINT_ADJUSTMENT_COMMODITY'] = {int(k): v for k, v in config_data['PRINT_ADJUSTMENT_COMMODITY'].items()}
+    config_data['MULTIPLES_MAP'] = {int(k): v for k, v in config_data['MULTIPLES_MAP'].items()}
     return config_data
 
 config = load_config()
