@@ -16,3 +16,5 @@ config.json
 
 compact.py
 expanded.py
+
+prompt.txt
