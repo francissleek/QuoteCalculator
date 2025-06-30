@@ -1,5 +1,5 @@
 # FILE: app.py
-# FINAL VERSION: "SQ' Discount" is a single dropdown that auto-selects and can be manually overridden.
+# FINAL VERSION: Added encoding='utf-8' to prevent UnicodeDecodeError.
 
 import streamlit as st
 import uuid
@@ -13,16 +13,21 @@ st.title("Universal Quote Calculator")
 def load_config(file_path='config.json'):
     config_data = None
     try:
+        # First, try to load from Streamlit's secrets management.
         if hasattr(st, 'secrets') and 'config' in st.secrets:
             config_data = st.secrets['config']
             if isinstance(config_data, str):
                 config_data = json.loads(config_data)
         else:
-            with open(file_path, 'r') as f:
+            # --- FIX: Added encoding='utf-8' ---
+            with open(file_path, 'r', encoding='utf-8') as f:
                 config_data = json.load(f)
     except (FileNotFoundError, st.errors.StreamlitAPIException):
+        # If secrets aren't configured or the file is not found,
+        # default to loading the local file. This makes local development easier.
         try:
-            with open(file_path, 'r') as f:
+            # --- FIX: Added encoding='utf-8' ---
+            with open(file_path, 'r', encoding='utf-8') as f:
                 config_data = json.load(f)
         except FileNotFoundError:
             st.error(f"Configuration file '{file_path}' not found. Please create it.")
@@ -31,6 +36,8 @@ def load_config(file_path='config.json'):
             st.error(f"Error decoding '{file_path}'. Please ensure it is valid JSON.")
             st.stop()
 
+
+    # Always convert keys to int for these fields, as JSON keys must be strings.
     config_data['VOLUME_DISCOUNT_TIERS'] = {int(k): v for k, v in config_data['VOLUME_DISCOUNT_TIERS'].items()}
     config_data['PRINT_ADJUSTMENT_COMMODITY'] = {int(k): v for k, v in config_data['PRINT_ADJUSTMENT_COMMODITY'].items()}
     config_data['MULTIPLES_MAP'] = {int(k): v for k, v in config_data['MULTIPLES_MAP'].items()}
@@ -39,11 +46,12 @@ def load_config(file_path='config.json'):
 config = load_config()
 
 # --- Unpack loaded data ---
+MATERIALS = config['MATERIALS']
 SIDES_TIERS_MAP = config['SIDES_TIERS_MAP']
 SIDEDNESS_OPTIONS = config['SIDEDNESS_OPTIONS']
 SPECIALTY_FINISHING = config['SPECIALTY_FINISHING']
 CUSTOMER_TYPES = config['CUSTOMER_TYPES']
-CUSTOMER_BASE_PRICES = config['CUSTOMER_BASE_PRICES']
+CUSTOMER_BASE_PRICES = config['CUSTOMER_BASE_PRICES'] # Kept for fallback, but new logic preferred
 VOLUME_DISCOUNT_TIERS = config['VOLUME_DISCOUNT_TIERS']
 PRINT_ADJUSTMENT_FIXED = config['PRINT_ADJUSTMENT_FIXED']
 PRINT_ADJUSTMENT_COMMODITY = config['PRINT_ADJUSTMENT_COMMODITY']
@@ -97,20 +105,34 @@ def get_banner_mesh_details(sqft, option_details):
     return "N/A", 0.0
 
 # --- Layout Rendering Function ---
-def render_expanded_layout(entry, i):
+def render_expanded_layout(entry, i, customer_type_index):
     """Renders the full-width, top-to-bottom layout for an entry."""
     with st.container(border=True):
         st.markdown(f"<a name='entry-{entry['id']}'></a>", unsafe_allow_html=True)
-        row1_col1, row1_col2, row1_col3 = st.columns([2, 3, 1])
-        with row1_col1:
-            entry['type'] = st.selectbox("Type", ["Banner", "Decal", "Other"], key=f"type_{entry['id']}", index=0)
-        with row1_col2:
-            entry['identifier'] = st.text_input("Identifier", key=f"id_{entry['id']}", value=entry.get('identifier', ''))
-        with row1_col3:
+        
+        # --- ROW 1: TYPE, MATERIAL, and REMOVE ---
+        type_col, material_col, remove_col = st.columns([2, 3, 1])
+        with type_col:
+            entry['type'] = st.selectbox("Type", list(MATERIALS.keys()), key=f"type_{entry['id']}", index=0)
+        
+        with material_col:
+            material_options = list(MATERIALS.get(entry['type'], {}).keys())
+            if not material_options:
+                st.warning(f"No materials defined for type '{entry['type']}'")
+                entry['material'] = None
+            else:
+                if entry.get('material') not in material_options:
+                    entry['material'] = material_options[0]
+                
+                entry['material'] = st.selectbox("Material", material_options, key=f"material_{entry['id']}")
+
+        with remove_col:
             st.write("")
             st.write("")
             if st.button("❌", key=f"remove_{entry['id']}", help="Remove this entry"):
-                return "remove_entry", None, None, None
+                return "remove_entry", 0, 0, None, 0
+
+        # --- ROW 2: DIMENSIONS & QUANTITY ---
         dim_col1, dim_col2, dim_col3 = st.columns([2, 2, 2])
         with dim_col1:
             w_ft_col, w_in_col = st.columns(2)
@@ -122,13 +144,24 @@ def render_expanded_layout(entry, i):
             with h_in_col: entry['h_in'] = st.number_input("Height (in)", min_value=0, key=f"h_in_{entry['id']}", value=entry.get('h_in', 0))
         with dim_col3:
             entry['qty'] = st.number_input("Num of pieces", min_value=1, key=f"qty_{entry['id']}", value=entry.get('qty', 1))
+        
         total_width_inches = (entry.get('w_ft', 0) * 12) + entry.get('w_in', 0)
         total_height_inches = (entry.get('h_ft', 0) * 12) + entry.get('h_in', 0)
         sqft_per_piece = (total_width_inches * total_height_inches) / 144
         total_sqft_entry = sqft_per_piece * entry.get('qty', 1)
-        metric_col1, metric_col2 = st.columns(2)
+
+        # --- ROW 3: METRICS ---
+        base_price_per_sqft = 0
+        if entry.get('material'):
+            prices = MATERIALS.get(entry['type'], {}).get(entry['material'], [0, 0, 0])
+            if len(prices) > customer_type_index:
+                base_price_per_sqft = prices[customer_type_index]
+
+        metric_col1, metric_col2, metric_col3 = st.columns(3)
         with metric_col1: st.metric(label="SQ'/piece", value=f"{sqft_per_piece:.2f}")
         with metric_col2: st.metric(label="Total SQ'", value=f"{total_sqft_entry:.2f}")
+        with metric_col3: st.metric(label="Material Cost/SQ'", value=f"${base_price_per_sqft:.2f}")
+
         st.divider()
         sc1, sc2, sc3 = st.columns([1, 2, 3])
         with sc1:
@@ -144,6 +177,7 @@ def render_expanded_layout(entry, i):
         with sc3:
             sides_cost_per_unit = SIDES_TIERS_MAP.get(entry.get('sides_tier_selection'), 0)
             st.metric(label="Sides Cost/Unit", value=f"${sides_cost_per_unit:.2f}")
+        
         fc1, fc2, fc3 = st.columns(3)
         with fc1:
             if entry['type'] == "Banner" and entry.get('finishing_type') == 'Nothing Special':
@@ -174,26 +208,37 @@ def render_expanded_layout(entry, i):
             cut_cost_per_unit = CUT_COST_MAP.get(selected_cut_cost_desc, 0)
         with cc2:
             st.metric(label="Cut Cost/Unit", value=f"${cut_cost_per_unit:.2f}")
+            
+    line_item_base_price = total_sqft_entry * base_price_per_sqft
     total_addons_cost_entry = (sides_cost_per_unit + finishing_price_per_unit + cut_cost_per_unit) * entry.get('qty', 1)
-    export_data = { "Type": entry.get('type'), "Identifier": entry.get('identifier'), "Num of pieces": entry.get('qty'), "Width (in)": total_width_inches, "Height (in)": total_height_inches, "SQ' per piece": f"{sqft_per_piece:.2f}", "Total SQ'": f"{total_sqft_entry:.2f}", "Sides Tier": selected_tier_desc, "Finishing Type": selected_type, "Finishing Option": dynamic_option_name, "Cut Cost Option": selected_cut_cost_desc, "Line Item Add-on Cost": f"{total_addons_cost_entry:.2f}" }
-    return "ok", total_sqft_entry, total_addons_cost_entry, export_data
+    
+    export_data = { "Type": entry.get('type'), "Material": entry.get('material'), "Num of pieces": entry.get('qty'), "Width (in)": total_width_inches, "Height (in)": total_height_inches, "SQ' per piece": f"{sqft_per_piece:.2f}", "Total SQ'": f"{total_sqft_entry:.2f}", "Sides Tier": selected_tier_desc, "Finishing Type": selected_type, "Finishing Option": dynamic_option_name, "Cut Cost Option": selected_cut_cost_desc, "Line Item Add-on Cost": f"{total_addons_cost_entry:.2f}" }
+    return "ok", total_sqft_entry, total_addons_cost_entry, export_data, line_item_base_price
 
 # --- Initialize session state ---
 if 'entries' not in st.session_state:
-    st.session_state.entries = [{"id": str(uuid.uuid4()),"type": "Banner","identifier": "","w_ft": 0,"w_in": 0,"h_ft": 0,"h_in": 0,"qty": 1,"sidedness": SIDEDNESS_OPTIONS[0],"cut_cost_selection": CUT_COST_OPTIONS[0],'finishing_type': 'Nothing Special','finishing_option': 'Nothing Special','sides_tier_selection': "STANDARD OVER 1sq'"}]
+    default_material = list(MATERIALS.get("Banner", {}).keys())[0]
+    st.session_state.entries = [{"id": str(uuid.uuid4()),"type": "Banner", "material": default_material, "w_ft": 0,"w_in": 0,"h_ft": 0,"h_in": 0,"qty": 1,"sidedness": SIDEDNESS_OPTIONS[0],"cut_cost_selection": CUT_COST_OPTIONS[0],'finishing_type': 'Nothing Special','finishing_option': 'Nothing Special','sides_tier_selection': "STANDARD OVER 1sq'"}]
+
+# --- SIDEBAR (Gets customer type first) ---
+st.sidebar.header("Quote Summary")
+customer_type_index = CUSTOMER_TYPES.index(st.sidebar.selectbox("Select Customer Type", options=CUSTOMER_TYPES, index=0))
+selected_customer_type = CUSTOMER_TYPES[customer_type_index]
 
 # --- Main App Logic ---
 total_sqft_order = 0
 total_order_addon_cost = 0
+total_base_price = 0
 data_for_export = []
 remove_entry_index = None
 
 for i, entry in enumerate(st.session_state.entries):
-    status, sqft, addon_cost, export_data = render_expanded_layout(entry, i)
+    status, sqft, addon_cost, export_data, line_item_base = render_expanded_layout(entry, i, customer_type_index)
     if status == "remove_entry": remove_entry_index = i
     else:
         total_sqft_order += sqft
         total_order_addon_cost += addon_cost
+        total_base_price += line_item_base
         data_for_export.append(export_data)
 
 if remove_entry_index is not None:
@@ -202,65 +247,39 @@ if remove_entry_index is not None:
 
 st.divider()
 if st.button("➕ Add New Entry", use_container_width=True):
-    st.session_state.entries.append({"id": str(uuid.uuid4()),"type": "Banner","identifier": "","w_ft": 0,"w_in": 0,"h_ft": 0,"h_in": 0,"qty": 1,"sidedness": SIDEDNESS_OPTIONS[0],"cut_cost_selection": CUT_COST_OPTIONS[0],'finishing_type': 'Nothing Special','finishing_option': 'Nothing Special','sides_tier_selection': "STANDARD OVER 1sq'"})
+    default_material = list(MATERIALS.get("Banner", {}).keys())[0]
+    st.session_state.entries.append({"id": str(uuid.uuid4()),"type": "Banner","material": default_material,"w_ft": 0,"w_in": 0,"h_ft": 0,"h_in": 0,"qty": 1,"sidedness": SIDEDNESS_OPTIONS[0],"cut_cost_selection": CUT_COST_OPTIONS[0],'finishing_type': 'Nothing Special','finishing_option': 'Nothing Special','sides_tier_selection': "STANDARD OVER 1sq'"})
     st.rerun()
 
-# --- SIDEBAR ---
-st.sidebar.header("Quote Summary")
-
+# --- SIDEBAR (Calculations and Display) ---
 with st.sidebar.expander("Go to Entry...", expanded=True):
     for i, entry in enumerate(st.session_state.entries):
-        identifier = entry.get('identifier') if entry.get('identifier') else f"Entry {i + 1}"
-        w_in = (entry.get('w_ft', 0) * 12) + entry.get('w_in', 0)
-        h_in = (entry.get('h_ft', 0) * 12) + entry.get('h_in', 0)
-        summary_text = f"**{identifier}**: {w_in}\" x {h_in}\" (Qty: {entry.get('qty', 1)})"
+        material = entry.get('material', 'N/A')
+        summary_text = f"**{material}**: {entry.get('w_ft', 0)}' {entry.get('w_in', 0)}\" x {entry.get('h_ft', 0)}' {entry.get('h_in', 0)}\" (Qty: {entry.get('qty', 1)})"
         st.markdown(f"[{summary_text}](#entry-{entry['id']})", unsafe_allow_html=True)
 
 st.sidebar.divider()
-
-customer_type_index = CUSTOMER_TYPES.index(st.sidebar.selectbox("Select Customer Type", options=CUSTOMER_TYPES, index=0))
-selected_customer_type = CUSTOMER_TYPES[customer_type_index]
-base_price_per_sqft = CUSTOMER_BASE_PRICES.get(selected_customer_type, 0)
-total_base_price = total_sqft_order * base_price_per_sqft
 st.sidebar.metric(label="TOTAL SQ' IN ORDER", value=f"{total_sqft_order:.2f}")
 st.sidebar.divider()
 
 subtotal = total_base_price + total_order_addon_cost
 
-# --- NEW SQ' DISCOUNT SECTION: Hybrid Dropdown ---
+# --- SQ' DISCOUNT SECTION: Hybrid Dropdown ---
 st.sidebar.markdown("#### SQ' Discount")
-
-# Create a mapping from the description to the discount values
-discount_tier_options = {
-    desc: discounts for _, (desc, discounts) in sorted(VOLUME_DISCOUNT_TIERS.items())
-}
+discount_tier_options = {desc: discounts for _, (desc, discounts) in sorted(VOLUME_DISCOUNT_TIERS.items())}
 options_list = list(discount_tier_options.keys())
-
-# Automatically find the best tier based on TOTAL SQ' IN ORDER
 auto_selected_tier = get_discount_tier_details(total_sqft_order, VOLUME_DISCOUNT_TIERS)
 try:
-    # Set the default index of the dropdown to the auto-selected tier
     default_index = options_list.index(auto_selected_tier)
 except ValueError:
     default_index = 0
-
-# A format function to show percentages in the dropdown
 def format_discount_option(description):
     discounts = discount_tier_options[description]
     return f"{description} ({discounts[0]:.2%}/{discounts[1]:.2%}/{discounts[2]:.2%})"
-
-# The dropdown now auto-selects but can also be manually changed
-selected_tier_description = st.sidebar.selectbox(
-    "Discount Tier",
-    options=options_list,
-    index=default_index,
-    format_func=format_discount_option,
-    help="This is automatically selected based on Total SQ', but you can override it."
-)
-
-# Get the final percentage based on the user's selection (manual or default)
+selected_tier_description = st.sidebar.selectbox("Discount Tier", options=options_list, index=default_index, format_func=format_discount_option, help="This is automatically selected based on Total SQ', but you can override it.")
 selected_percentage = discount_tier_options[selected_tier_description][customer_type_index]
-# --- END NEW SECTION ---
+
+st.sidebar.info(f"Applying **{selected_percentage:.2%}** discount for **{selected_customer_type}** customer.")
 
 price_after_sq_discount = subtotal * (1 - selected_percentage)
 st.sidebar.divider()
@@ -284,7 +303,7 @@ st.sidebar.divider()
 
 if data_for_export:
     df = pd.DataFrame(data_for_export)
-    summary_data = { "Type": "---", "Identifier": "FINANCIAL SUMMARY", "Num of pieces": "---", "Width (in)": "---", "Height (in)": "---", "SQ' per piece": "---", "Total SQ'": "---", "Sides Tier": "---", "Finishing Type": "---", "Finishing Option": "---", "Cut Cost Option": "---", "Line Item Add-on Cost": "---", "Customer Type": selected_customer_type, "SQ' Discount": f"{selected_percentage:.2%}", "Print Adjustment": selected_adjustment_label, "Multiplier": f"x{multiples_value} ({multiple_desc})", "GRAND TOTAL": f"{grand_total:,.2f}" }
+    summary_data = { "Type": "---", "Material": "FINANCIAL SUMMARY", "Num of pieces": "---", "Width (in)": "---", "Height (in)": "---", "SQ' per piece": "---", "Total SQ'": "---", "Sides Tier": "---", "Finishing Type": "---", "Finishing Option": "---", "Cut Cost Option": "---", "Line Item Add-on Cost": "---", "Customer Type": selected_customer_type, "SQ' Discount": f"{selected_percentage:.2%}", "Print Adjustment": selected_adjustment_label, "Multiplier": f"x{multiples_value} ({multiple_desc})", "GRAND TOTAL": f"{grand_total:,.2f}" }
     summary_df = pd.DataFrame([summary_data])
     combined_df = pd.concat([df, summary_df], ignore_index=True)
     csv = combined_df.to_csv(index=False).encode('utf-8')
