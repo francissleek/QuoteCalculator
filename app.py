@@ -144,15 +144,15 @@ def render_expanded_layout(entry, i):
 
         dim_col1, dim_col2, dim_col3 = st.columns([2, 2, 2]) #
         with dim_col1: #
-            st.markdown("**Width**"); w_ft_col, w_in_col = st.columns(2) #
+            w_ft_col, w_in_col = st.columns(2) #
             with w_ft_col: entry['w_ft'] = st.number_input("Width (ft)", min_value=0, key=f"w_ft_{entry['id']}", value=entry.get('w_ft', 0)) #
             with w_in_col: entry['w_in'] = st.number_input("Width (in)", min_value=0, key=f"w_in_{entry['id']}", value=entry.get('w_in', 0)) #
         with dim_col2: #
-            st.markdown("**Height**"); h_ft_col, h_in_col = st.columns(2) #
+            h_ft_col, h_in_col = st.columns(2) #
             with h_ft_col: entry['h_ft'] = st.number_input("Height (ft)", min_value=0, key=f"h_ft_{entry['id']}", value=entry.get('h_ft', 0)) #
             with h_in_col: entry['h_in'] = st.number_input("Height (in)", min_value=0, key=f"h_in_{entry['id']}", value=entry.get('h_in', 0)) #
         with dim_col3: #
-            st.markdown("**Quantity**"); entry['qty'] = st.number_input("Num of pieces", min_value=1, key=f"qty_{entry['id']}", value=entry.get('qty', 1), label_visibility="collapsed") #
+            st.number_input("Num of pieces", min_value=1, key=f"qty_{entry['id']}", value=entry.get('qty', 1)) #
 
         total_width_inches = (entry.get('w_ft', 0) * 12) + entry.get('w_in', 0) #
         total_height_inches = (entry.get('h_ft', 0) * 12) + entry.get('h_in', 0) #
