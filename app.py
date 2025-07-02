@@ -1,6 +1,3 @@
-# FILE: app.py
-# CORRECTED: Restored the 'BASE AMOUNT' and 'MAX DISCOUNT' display metrics in each entry.
-
 import streamlit as st
 import uuid
 import pandas as pd
@@ -34,7 +31,6 @@ def load_config(file_path='config.json'):
         st.error(f"FATAL: Error decoding local file '{file_path}'. Please ensure it is valid JSON. Error: {e}")
         st.stop()
 
-
 # --- Load config into session state to share across pages ---
 if 'config' not in st.session_state:
     st.session_state.config = load_config()
@@ -61,6 +57,15 @@ CUT_COST_OPTIONS = list(CUT_COST_MAP.keys())
 ADDITIONAL_TIME_OPTIONS = list(ADDITIONAL_TIME_MAP.keys())
 ADDED_INSTALL_OPTIONS = list(ADDED_INSTALL_MAP.keys())
 
+# --- NEW: Load ADDITIONAL_COSTS from config (not in UI) ---
+ADDITIONAL_COSTS = config.get('ADDITIONAL_COSTS', {
+    "cons_bx_4": 12.50,
+    "cons_bx_6": 12.50,
+    "prodcuts_an": 16.21
+})
+cons_bx_4 = ADDITIONAL_COSTS.get("cons_bx_4", 12.50)
+cons_bx_6 = ADDITIONAL_COSTS.get("cons_bx_6", 12.50)
+prodcuts_an = ADDITIONAL_COSTS.get("prodcuts_an", 16.21)
 
 # --- Helper functions ---
 def excel_floor(number, significance):
@@ -191,7 +196,7 @@ def render_expanded_layout(entry, i, customer_type):
 
         base_price_per_sqft = 0
         active_base_amount = 0
-        active_max_discount = 0 # RESTORED: Initialize variable
+        active_max_discount = 0
         
         if entry.get('material'):
             material_data = MATERIALS.get(entry['type'], {}).get(entry['material'], {})
@@ -200,7 +205,6 @@ def render_expanded_layout(entry, i, customer_type):
                 price_map = {'Preferred': 'preferred_value', 'Corporate': 'corporate_value', 'Wholesale': 'wholesale_value'}
                 base_map = {'Preferred': 'preferred_base', 'Corporate': 'corporate_base', 'Wholesale': 'wholesale_base'}
                 
-                # RESTORED: Calculate all necessary price values
                 active_base_amount = calculated_prices.get(base_map.get(customer_type, 'preferred_base'), 0)
                 active_max_discount = calculated_prices.get(price_map.get(customer_type, 'preferred_value'), 0)
                 base_price_per_sqft = active_max_discount
@@ -211,7 +215,6 @@ def render_expanded_layout(entry, i, customer_type):
         with metric_col2: st.metric(label="Total SQ'", value=f"{total_sqft_entry:.2f}")
         with metric_col3: st.metric(label="Applied Price/SQ'", value=f"${base_price_per_sqft:.2f}")
         
-        # RESTORED: Display for BASE AMOUNT and MAX DISCOUNT
         st.markdown("---")
         price_col1, price_col2 = st.columns(2)
         with price_col1:
@@ -288,7 +291,6 @@ def render_expanded_layout(entry, i, customer_type):
         with ai2:
             st.metric(label="Added Install Cost/Unit", value=f"${added_install_cost_per_unit:.2f}")
     
-    # --- Data for Export and Calculation ---
     export_data = { "Type": entry.get('type'), "Material": entry.get('material'), "Num of pieces": entry.get('qty'), "Width (in)": total_width_inches, "Height (in)": total_height_inches, "SQ' per piece": f"{sqft_per_piece:.2f}", "Total SQ'": f"{total_sqft_entry:.2f}"}
     
     calculation_data = {
@@ -404,11 +406,7 @@ else:
     adjustment_percentage = 0
 st.sidebar.divider()
 
-st.sidebar.markdown("#### Additional Costs")
-cons_bx_4 = st.sidebar.number_input("cons_bx_4", value=12.50, format="%.2f")
-cons_bx_6 = st.sidebar.number_input("cons_bx_6", value=12.50, format="%.2f")
-prodcuts_an = st.sidebar.number_input("prodcuts_an", value=16.21, format="%.2f")
-st.sidebar.divider()
+# --- REMOVED: Additional Costs number inputs (now from config only!) ---
 
 st.sidebar.markdown("#### Multiples")
 num_entries = len(st.session_state.entries)
@@ -419,7 +417,6 @@ st.sidebar.metric(label=f"Multiplier ({multiple_desc})", value=f"x{multiples_val
 grand_total = 0
 
 if selected_customer_type == 'Preferred':
-    # NEW PREFERRED LOGIC: Switched to the new detailed formula for Preferred customers.
     total_pieces_in_quote = sum(c['qty'] for c in all_calculations)
     if total_pieces_in_quote > 0 and multiples_value > 0:
         preferred_total = 0
@@ -479,7 +476,6 @@ if selected_customer_type == 'Preferred':
         # Apply final markup
         # grand_total = preferred_total * 1.1
         grand_total = price_per_single_piece * 1.1
-
 
 else:
     # Original logic for Corporate and Wholesale
