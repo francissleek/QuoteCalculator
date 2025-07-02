@@ -1,5 +1,5 @@
 # FILE: app.py
-# FIXED: Restored the Sidedness, Finishing, and Cut options on the main calculator page.
+# FIXED: Restored the missing get_banner_mesh_details helper function.
 
 import streamlit as st
 import uuid
@@ -11,22 +11,34 @@ import math
 st.set_page_config(layout="wide", page_title="Universal Quote Calculator")
 st.title("Universal Quote Calculator")
 
+# --- CORRECTED DUAL-ENVIRONMENT CONFIGURATION LOADER ---
 def load_config(file_path='config.json'):
+    """
+    Loads configuration with a clear distinction between deployed (secrets)
+    and local (file) environments.
+    """
+    try:
+        if "config" in st.secrets:
+            config_str = st.secrets["config"]
+            return json.loads(config_str)
+    except (st.errors.StreamlitAPIException, KeyError, json.JSONDecodeError):
+        pass
+
     try:
         with open(file_path, 'r', encoding='utf-8') as f:
             return json.load(f)
     except FileNotFoundError:
-        st.error(f"FATAL: Configuration file '{file_path}' not found. Please create it.")
+        st.error(f"FATAL: Configuration could not be loaded. Ensure a 'config.json' file exists for local development, or that secrets are configured correctly for deployment.")
         st.stop()
-    except json.JSONDecodeError:
-        st.error(f"FATAL: Error decoding '{file_path}'. Please ensure it is valid JSON.")
+    except json.JSONDecodeError as e:
+        st.error(f"FATAL: Error decoding local file '{file_path}'. Please ensure it is valid JSON. Error: {e}")
         st.stop()
+
 
 # --- Load config into session state to share across pages ---
 if 'config' not in st.session_state:
     st.session_state.config = load_config()
 
-# Use the config from session state
 config = st.session_state.config
 
 # --- Unpack loaded data ---
@@ -90,10 +102,8 @@ def calculate_material_price(material_data):
         wholesale_value = wholesale_base * (1 - w_discount_value)
         results['wholesale_base'] = wholesale_base
         results['wholesale_value'] = wholesale_value
-
     except (KeyError, TypeError):
         pass
-        
     return results
 
 # --- Other Helper Functions ---
@@ -122,9 +132,12 @@ def get_suggested_sides_tier(sqft, sidedness):
         if sqft >= 0.5: return "DOUBLE SIDED between 1sq' - 0.5sq' per peice"
         if sqft >= 0.25: return "DOUBLE SIDED under 0.5 - .25 sq' /peice"
         return "DOUBLE SIDED under 0.05 sq' /peice"
-    return TIER_DESCRIPTIONS[0]
+    return TIER_DESCRIPTIONS[0] if TIER_DESCRIPTIONS else "N/A"
 
+# --- RESTORED HELPER FUNCTION ---
 def get_banner_mesh_details(sqft, option_details):
+    # This function assumes a specific structure for Banner/Mesh finishing in config
+    if not option_details: return "N/A", 0.0
     option_name = list(option_details.keys())[0]
     tier_list = option_details[option_name]
     for min_sqft, price, desc_prefix in tier_list:
@@ -210,7 +223,6 @@ def render_expanded_layout(entry, i, customer_type):
 
         st.divider()
         
-        # --- RESTORED ADDON SECTIONS ---
         sc1, sc2, sc3 = st.columns([1, 2, 3])
         with sc1:
             sidedness_index = SIDEDNESS_OPTIONS.index(entry.get('sidedness', SIDEDNESS_OPTIONS[0]))
@@ -241,9 +253,9 @@ def render_expanded_layout(entry, i, customer_type):
             options_for_type = SPECIALTY_FINISHING.get(selected_type, {})
             dynamic_option_name = ""
             finishing_price_per_unit = 0
-            if selected_type == "Banner/Mesh":
-                dynamic_option_name, finishing_price_per_unit = get_banner_mesh_details(sqft_per_piece, options_for_type)
-                st.text_input("Finishing Option", value=dynamic_option_name, key=f"fin_opt_{entry['id']}", disabled=True)
+            if selected_type == "Banner/Mesh" and "POCKET or HEMM AND GROMMETS EVERY 2'" in options_for_type:
+                 dynamic_option_name, finishing_price_per_unit = get_banner_mesh_details(sqft_per_piece, options_for_type)
+                 st.text_input("Finishing Option", value=dynamic_option_name, key=f"fin_opt_{entry['id']}", disabled=True)
             else:
                 if list(options_for_type.keys()):
                     selected_option = st.selectbox("Finishing Option", options=list(options_for_type.keys()), key=f"fin_opt_{entry['id']}", index=0)
@@ -278,6 +290,9 @@ if 'entries' not in st.session_state:
 
 # --- SIDEBAR (Gets customer type first) ---
 st.sidebar.header("Quote Summary")
+if not CUSTOMER_TYPES:
+    st.sidebar.error("Customer types not defined in config.")
+    st.stop()
 customer_type_index = CUSTOMER_TYPES.index(st.sidebar.selectbox("Select Customer Type", options=CUSTOMER_TYPES, index=0))
 selected_customer_type = CUSTOMER_TYPES[customer_type_index]
 
@@ -287,6 +302,9 @@ total_order_addon_cost = 0
 total_base_price = 0
 data_for_export = []
 remove_entry_index = None
+
+if not st.session_state.entries:
+    st.warning("No quote entries yet. Click below to add one.")
 
 for i, entry in enumerate(st.session_state.entries):
     status, sqft, addon_cost, export_data, line_item_base = render_expanded_layout(entry, i, selected_customer_type)
@@ -322,26 +340,32 @@ st.sidebar.divider()
 subtotal = total_base_price + total_order_addon_cost
 
 st.sidebar.markdown("#### SQ' Discount")
-discount_tier_options = {desc: discounts for _, (desc, discounts) in sorted(VOLUME_DISCOUNT_TIERS.items())}
-options_list = list(discount_tier_options.keys())
-auto_selected_tier = get_discount_tier_details(total_sqft_order, VOLUME_DISCOUNT_TIERS)
-try:
-    default_index = options_list.index(auto_selected_tier)
-except ValueError:
-    default_index = 0
-def format_discount_option(description):
-    discounts = discount_tier_options[description]
-    return f"{description} ({discounts[0]:.2%}/{discounts[1]:.2%}/{discounts[2]:.2%})"
-selected_tier_description = st.sidebar.selectbox("Discount Tier", options=options_list, index=default_index, format_func=format_discount_option, help="This is automatically selected based on Total SQ', but you can override it.")
-selected_percentage = discount_tier_options[selected_tier_description][customer_type_index]
-st.sidebar.info(f"Applying **{selected_percentage:.2%}** discount for **{selected_customer_type}** customer.")
+if VOLUME_DISCOUNT_TIERS:
+    discount_tier_options = {desc: discounts for _, (desc, discounts) in sorted(VOLUME_DISCOUNT_TIERS.items())}
+    options_list = list(discount_tier_options.keys())
+    auto_selected_tier = get_discount_tier_details(total_sqft_order, VOLUME_DISCOUNT_TIERS)
+    try:
+        default_index = options_list.index(auto_selected_tier)
+    except ValueError:
+        default_index = 0
+    def format_discount_option(description):
+        discounts = discount_tier_options[description]
+        return f"{description} ({discounts[0]:.2%}/{discounts[1]:.2%}/{discounts[2]:.2%})"
+    selected_tier_description = st.sidebar.selectbox("Discount Tier", options=options_list, index=default_index, format_func=format_discount_option, help="This is automatically selected based on Total SQ', but you can override it.")
+    selected_percentage = discount_tier_options[selected_tier_description][customer_type_index]
+    st.sidebar.info(f"Applying **{selected_percentage:.2%}** discount for **{selected_customer_type}** customer.")
+else:
+    selected_percentage = 0
 
 price_after_sq_discount = subtotal * (1 - selected_percentage)
 st.sidebar.divider()
 
 st.sidebar.markdown("#### Print Adjustment")
-selected_adjustment_label = st.sidebar.selectbox("Select Adjustment", options=list(PRINT_ADJUSTMENT_FIXED.keys()), index=0)
-adjustment_percentage = PRINT_ADJUSTMENT_FIXED[selected_adjustment_label]
+if PRINT_ADJUSTMENT_FIXED:
+    selected_adjustment_label = st.sidebar.selectbox("Select Adjustment", options=list(PRINT_ADJUSTMENT_FIXED.keys()), index=0)
+    adjustment_percentage = PRINT_ADJUSTMENT_FIXED[selected_adjustment_label]
+else:
+    adjustment_percentage = 0
 price_after_print_adjustment = price_after_sq_discount * (1 + adjustment_percentage)
 st.sidebar.divider()
 
