@@ -50,7 +50,7 @@ CUT_COST_OPTIONS = list(CUT_COST_MAP.keys())
 ADDITIONAL_TIME_OPTIONS = list(ADDITIONAL_TIME_MAP.keys())
 ADDED_INSTALL_OPTIONS = list(ADDED_INSTALL_MAP.keys())
 
-# --- DYNAMIC COST CALCULATION ---
+# --- DYNAMIC COST CALCULATION (Original) ---
 def calculate_additional_costs(cost_config):
     bx4_vars = cost_config.get("cons_bx_4", {})
     bx4_v1 = bx4_vars.get("variable_1", 0)
@@ -64,11 +64,43 @@ def calculate_additional_costs(cost_config):
     bx6_v3 = bx6_vars.get("variable_3", 0)
     calculated_bx6 = (bx6_v1 / bx6_v2) * bx6_v3 if bx6_v2 != 0 else 0
     
-    calculated_prodcuts_an = cost_config.get("prodcuts_an", 16.21)
-    return calculated_bx4, calculated_bx6, calculated_prodcuts_an
+    # This default is now a fallback
+    default_prodcuts_an = cost_config.get("prodcuts_an", 16.21)
+    return calculated_bx4, calculated_bx6, default_prodcuts_an
 
 ADDITIONAL_COSTS_CONFIG = config.get('ADDITIONAL_COSTS', {})
-cons_bx_4, cons_bx_6, prodcuts_an = calculate_additional_costs(ADDITIONAL_COSTS_CONFIG)
+cons_bx_4, cons_bx_6, default_prodcuts_an = calculate_additional_costs(ADDITIONAL_COSTS_CONFIG)
+
+# --- NEW: DYNAMIC PRODCUTS_AN CALCULATION ---
+def calculate_dynamic_prodcuts_an(vars, Q_Quantity):
+    """Calculates the dynamic 'prodcuts_an' value based on material-specific variables."""
+    if not vars or Q_Quantity == 0:
+        return 0
+
+    # Unpack variables with defaults
+    AW_Roll_Costs = vars.get("AW_Roll_Costs", 0)
+    AU_Material_Length = vars.get("AU_Material_Length", 1) # Avoid division by zero
+    AV_Material_Width = vars.get("AV_Material_Width", 1) # Avoid division by zero
+    AQ_SQ = vars.get("AQ_SQ", 0)
+    AS_Laminate_Loading = vars.get("AS_Laminate_Loading", 0)
+    AT_Labour = vars.get("AT_Labour", 0)
+    constant_BY8 = vars.get("constant_BY8", 0)
+    Per_hour_rate = vars.get("Per_hour_rate", 0)
+
+    # AX_Sq_material = AW/((AU*AV)/144)
+    denominator_ax = (AU_Material_Length * AV_Material_Width) / 144
+    AX_Sq_material = AW_Roll_Costs / denominator_ax if denominator_ax != 0 else 0
+
+    # 'Form Responses 1'!$BX$8 = (constant_BY8/60) * Per_hour_rate
+    form_response_bx8 = (constant_BY8 / 60) * Per_hour_rate
+
+    # AO = (AX_Sq_material*AQ) + AS + AT
+    AO = (AX_Sq_material * AQ_SQ) + AS_Laminate_Loading + AT_Labour
+    
+    # AN = (AO+('Form Responses 1'!$BX$8/Q)+AS,"")
+    AN = AO + (form_response_bx8 / Q_Quantity) + AS_Laminate_Loading
+
+    return AN
 
 # --- Helper functions ---
 def excel_floor(number, significance):
@@ -139,7 +171,9 @@ def get_banner_mesh_details(sqft, option_details):
     return "N/A", 0.0
 
 # --- Function to calculate a STABLE total for a single entry ---
-def calculate_entry_total(calc_data, customer_type, selected_percentage, adjustment_percentage, multiples_value):
+
+
+def calculate_entry_total(calc_data, customer_type, selected_percentage, adjustment_percentage, multiples_value, prodcuts_an):
     """Calculates the STABLE total for a single line item."""
     entry_total = 0
     
@@ -234,6 +268,7 @@ def render_expanded_layout(entry, i, customer_type, selected_percentage, adjustm
         total_sqft_entry = sqft_per_piece * entry.get('qty', 1)
 
         base_price_per_sqft, active_base_amount = 0, 0
+        material_data = {}
         if entry.get('material'):
             material_data = MATERIALS.get(entry['type'], {}).get(entry['material'], {})
             if material_data:
@@ -323,10 +358,18 @@ def render_expanded_layout(entry, i, customer_type, selected_percentage, adjustm
         "sides_cost_per_unit": sides_cost_per_unit, "finishing_price_per_unit": finishing_price_per_unit,
         "cut_cost_per_unit": cut_cost_per_unit, "additional_time_cost_per_unit": additional_time_cost_per_unit,
         "added_install_cost_per_unit": added_install_cost_per_unit,
+        "material_data": material_data
     }
 
+    # --- Calculate prodcuts_an for this specific entry ---
+    prodcuts_an_vars = material_data.get("prodcuts_an_vars")
+    if prodcuts_an_vars:
+        prodcuts_an_for_entry = calculate_dynamic_prodcuts_an(prodcuts_an_vars, entry.get('qty', 1))
+    else:
+        prodcuts_an_for_entry = default_prodcuts_an
+
     # --- Calculate and display the STABLE total for this specific entry ---
-    entry_total = calculate_entry_total(calculation_data, customer_type, selected_percentage, adjustment_percentage, multiples_value)
+    entry_total = calculate_entry_total(calculation_data, customer_type, selected_percentage, adjustment_percentage, multiples_value, prodcuts_an_for_entry)
     with total_col:
         st.metric(label="**ENTRY TOTAL**", value=f"${entry_total:,.2f}")
 
