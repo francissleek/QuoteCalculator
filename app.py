@@ -100,7 +100,7 @@ def calculate_dynamic_prodcuts_an(vars, Q_Quantity):
     # AN = (AO+('Form Responses 1'!$BX$8/Q)+AS,"")
     AN = AO + (form_response_bx8 / Q_Quantity) + AS_Laminate_Loading
 
-    return AN
+    return AO, AN
 
 # --- Helper functions ---
 def excel_floor(number, significance):
@@ -197,14 +197,28 @@ def calculate_entry_total(calc_data, customer_type, selected_percentage, adjustm
         print(f"Part B Original: {part_b_original}, Part A Discounted: {part_a_discounted}")
         # Part C - Uses the entry's own quantity
         part_c_numerator = (calc_data['finishing_price_per_unit'] * calc_data['sqft_per_piece'] * entry_quantity) + (prodcuts_an / multiples_value_for_entry)
+        print(f"Prodcuts AN {prodcuts_an}")
         part_c = part_c_numerator / entry_quantity
         print(f"Part C Numerator: {part_c_numerator}, Entry Quantity: {entry_quantity}, Part C: {part_c}")
-        # Part D - Uses the entry's own quantity
-        part_d = (cons_bx_4 / multiples_value_for_entry) / entry_quantity
-        print(f"Cons Bx 4: {cons_bx_4}, Multiples Value: {multiples_value}, Entry Quantity: {entry_quantity}, Part D: {part_d}")
-        # Part E - Uses the entry's own quantity
-        part_e = (cons_bx_6 / multiples_value_for_entry) / entry_quantity
-        print(f"Cons Bx 6: {cons_bx_6}, Multiples Value: {multiples_value}, Entry Quantity: {entry_quantity}, Part E: {part_e}")
+
+        if calc_data['cut_cost_per_unit'] == 0.0:
+            part_d = 0
+            print("Cut Cost is 'NO CUT', Part D set to 0")
+        else:
+            # Part D - Uses the entry's own quantity
+            part_d = (cons_bx_4 / multiples_value_for_entry) / entry_quantity
+            print(f"Theres a cut cost, calculating Part D: {calc_data['cut_cost_per_unit']}")
+            print(f"Cons Bx 4: {cons_bx_4}, Multiples Value: {multiples_value}, Entry Quantity: {entry_quantity}, Part D: {part_d}")
+
+        if calc_data['finishing_price_per_unit'] == 0:
+            part_e = 0
+            print("Finishing Price is 0, Part E set to 0")
+        else:
+            # Part E - Uses the entry's own quantity
+            part_e = (cons_bx_6 / multiples_value_for_entry) / entry_quantity
+            print(f"Cons Bx 6: {cons_bx_6}, Multiples Value: {multiples_value}, Entry Quantity: {entry_quantity}, Part E: {part_e}")
+
+
         # Part F - Uses the entry's own quantity
         part_f = (calc_data['additional_time_cost_per_unit'] / entry_quantity) + calc_data['added_install_cost_per_unit']
         print(f"Additional Time Cost: {calc_data['additional_time_cost_per_unit']}, Added Install Cost: {calc_data['added_install_cost_per_unit']}, Entry Quantity: {entry_quantity}, Part F: {part_f}")
@@ -364,7 +378,8 @@ def render_expanded_layout(entry, i, customer_type, selected_percentage, adjustm
     # --- Calculate prodcuts_an for this specific entry ---
     prodcuts_an_vars = material_data.get("prodcuts_an_vars")
     if prodcuts_an_vars:
-        prodcuts_an_for_entry = calculate_dynamic_prodcuts_an(prodcuts_an_vars, entry.get('qty', 1))
+        AO, prodcuts_an_for_entry = calculate_dynamic_prodcuts_an(prodcuts_an_vars, entry.get('qty', 1))
+        print(f"AO: {AO}")
     else:
         prodcuts_an_for_entry = default_prodcuts_an
 
