@@ -3,7 +3,7 @@ import uuid
 import pandas as pd
 import json
 import math
-
+import os
 # --- Page Configuration ---
 st.set_page_config(layout="wide", page_title="Universal Quote Calculator")
 st.title("Universal Quote Calculator")
@@ -115,22 +115,22 @@ def calculate_material_price(material_data):
     results = {'preferred_base': 0, 'preferred_value': 0, 'corporate_base': 0, 'corporate_value': 0, 'wholesale_base': 0, 'wholesale_value': 0}
     try:
         p_vars = material_data['Preferred']
-        p_variable_1, p_variable_2, p_discount_value = p_vars.get('p_variable_1', 0), p_vars.get('p_variable_2', 0), p_vars.get('p_discount_value', 0)
-        preferred_base = excel_floor(p_variable_1 * p_variable_2, FALL_BACK_VALUE)
+        preferred_historical_price, preferred_fine_tune_modifier, preferred_discount_value = p_vars.get('preferred_historical_price', 0), p_vars.get('preferred_fine_tune_modifier', 0), p_vars.get('preferred_discount_value', 0)
+        preferred_base = excel_floor(preferred_historical_price * preferred_fine_tune_modifier, FALL_BACK_VALUE)
         results['preferred_base'] = preferred_base
-        results['preferred_value'] = preferred_base * (1 - p_discount_value)
+        results['preferred_value'] = preferred_base * (1 - preferred_discount_value)
 
         c_vars = material_data['Corporate']
-        c_variable_1, c_discount_value = c_vars.get('c_variable_1', 0), c_vars.get('c_discount_value', 0)
-        corporate_base = excel_ceiling(preferred_base * c_variable_1, FALL_BACK_VALUE)
+        corporate_historical_price, corporate_discount_value = c_vars.get('corporate_historical_price', 0), c_vars.get('corporate_discount_value', 0)
+        corporate_base = excel_ceiling(preferred_base * corporate_historical_price, FALL_BACK_VALUE)
         results['corporate_base'] = corporate_base
-        results['corporate_value'] = corporate_base * (1 - c_discount_value)
+        results['corporate_value'] = corporate_base * (1 - corporate_discount_value)
 
         w_vars = material_data['Wholesale']
-        w_variable_1, w_discount_value = w_vars.get('w_variable_1', 0), w_vars.get('w_discount_value', 0)
-        wholesale_base = excel_ceiling(preferred_base * w_variable_1, FALL_BACK_VALUE)
+        wholesale_historical_price, wholesale_discount_value = w_vars.get('wholesale_historical_price', 0), w_vars.get('wholesale_discount_value', 0)
+        wholesale_base = excel_ceiling(preferred_base * wholesale_historical_price, FALL_BACK_VALUE)
         results['wholesale_base'] = wholesale_base
-        results['wholesale_value'] = wholesale_base * (1 - w_discount_value)
+        results['wholesale_value'] = wholesale_base * (1 - wholesale_discount_value)
     except (KeyError, TypeError): pass
     return results
 
@@ -174,48 +174,140 @@ def get_banner_mesh_details(sqft, option_details):
 
 def perform_price_calculation(calc_data, customer_type, active_base_amount, discount_percentage, adjustment_percentage, multiples_value, prodcuts_an):
     """Performs the core price calculation for a given customer type and its specific inputs."""
+    os.system('cls' if os.name == 'nt' else 'clear')
     entry_quantity = calc_data.get('qty', 1)
     if entry_quantity == 0:
         return 0
 
     # For entry-level calculations, a stable multiples value of 1 is used.
-    multiples_value_for_entry = 1
+    multiples_value_for_entry = multiples_value
 
     # Part A: Material Cost
     part_a_base = active_base_amount * calc_data['sqft_per_piece'] * calc_data['sides_cost_per_unit']
     part_a_discounted = part_a_base * (1 - (discount_percentage + adjustment_percentage))
+    print(f"""
+        part_a_base Formula: active_base_amount * sqft_per_piece * sides_cost_per_unit
+        active_base_amount: {active_base_amount},
+        sqft_per_piece: {calc_data['sqft_per_piece']},
+        sides_cost_per_unit: {calc_data['sides_cost_per_unit']},
+        part_a_base: {part_a_base},
 
+        part_a_discounted Formula: part_a_base * (1 - (discount_percentage + adjustment_percentage))
+        discount_percentage: {discount_percentage},
+        adjustment_percentage: {adjustment_percentage}, 
+        part_a_discounted: {part_a_discounted}
+        """)
+    
     # Part B: Cut Cost
     part_b_original = calc_data['cut_cost_per_unit'] * calc_data['sqft_per_piece']
     part_b = part_b_original + part_a_discounted
+    print(f"""
+        part_b_original Formula: cut_cost_per_unit * sqft_per_piece
+        cut_cost_per_unit: {calc_data['cut_cost_per_unit']},
+        sqft_per_piece: {calc_data['sqft_per_piece']},
+        part_b_original: {part_b_original},
 
+        part_b Formula: part_b_original + part_a_discounted
+        part_b_original: {part_b_original},
+        part_a_discounted: {part_a_discounted},
+        part_b: {part_b}
+    """)
+    
     # Part C: Finishing Cost
     part_c_numerator = (calc_data['finishing_price_per_unit'] * calc_data['sqft_per_piece'] * entry_quantity) + (prodcuts_an / multiples_value_for_entry)
     part_c = part_c_numerator / entry_quantity
+    print(f"""
+        part_c_numerator Formula: (finishing_price_per_unit * sqft_per_piece * entry_quantity) + (prodcuts_an / multiples_value_for_entry)
+        finishing_price_per_unit: {calc_data['finishing_price_per_unit']},
+        sqft_per_piece: {calc_data['sqft_per_piece']},
+        entry_quantity: {entry_quantity},
+        prodcuts_an: {prodcuts_an},
+        multiples_value_for_entry: {multiples_value_for_entry},
+        part_c_numerator: {part_c_numerator},
+
+        part_c Formula: part_c_numerator / entry_quantity
+        part_c: {part_c}
+    """)
 
     # Part D: Fixed Cut Cost
     if calc_data['cut_cost_per_unit'] == 0.0:
         part_d = 0
+        print(f"""
+        part_d Formula for Preferred: (cons_bx_4 / multiples_value_for_entry) / entry_quantity
+        cons_bx_4: {cons_bx_4},
+        multiples_value_for_entry: {multiples_value_for_entry},
+        entry_quantity: {entry_quantity},
+        part_d is 0 because cut_cost_per_unit is 0.0
+    """)
     elif customer_type == 'Preferred':
         part_d = (cons_bx_4 / multiples_value_for_entry) / entry_quantity
+        print(f"""
+        part_d Formula for Preferred: (cons_bx_4 / multiples_value_for_entry) / entry_quantity
+        cons_bx_4: {cons_bx_4},
+        multiples_value_for_entry: {multiples_value_for_entry},
+        entry_quantity: {entry_quantity},
+        part_d: {part_d}
+    """)
     else:  # Corporate and Wholesale
         part_d = (cons_bx_4 / multiples_value_for_entry + 0.5) / entry_quantity
+        print(f"""
+        part_d Formula for Corporate/Wholesale: (cons_bx_4 / multiples_value_for_entry + 0.5) / entry_quantity
+        cons_bx_4: {cons_bx_4},
+        multiples_value_for_entry: {multiples_value_for_entry},
+        entry_quantity: {entry_quantity},
+        part_d: {part_d}
+    """)
 
     # Part E: Fixed Finishing Cost
     if calc_data['finishing_price_per_unit'] == 0:
         part_e = 0
+        print(f"""
+        part_e Formula: (cons_bx_6 / multiples_value_for_entry) / entry_quantity
+        cons_bx_6: {cons_bx_6},
+        multiples_value_for_entry: {multiples_value_for_entry},
+        entry_quantity: {entry_quantity},
+        part_e is 0 because finishing_price_per_unit is 0
+    """)
     else:
         part_e = (cons_bx_6 / multiples_value_for_entry) / entry_quantity
+        print(f"""
+        part_e Formula: (cons_bx_6 / multiples_value_for_entry) / entry_quantity
+        cons_bx_6: {cons_bx_6},
+        multiples_value_for_entry: {multiples_value_for_entry},
+        entry_quantity: {entry_quantity},
+        part_e: {part_e}
+    """)
 
     # Part F: Time and Install Costs
     part_f = (calc_data['additional_time_cost_per_unit'] / entry_quantity) + calc_data['added_install_cost_per_unit']
+    print(f"""
+        part_f Formula: (additional_time_cost_per_unit / entry_quantity) + added_install_cost_per_unit
+        additional_time_cost_per_unit: {calc_data['additional_time_cost_per_unit']},
+        entry_quantity: {entry_quantity},    
+        added_install_cost_per_unit: {calc_data['added_install_cost_per_unit']},
+        part_f: {part_f}
+    """)
 
     # Combine all parts for the price of a single piece
     price_per_single_piece = part_b + part_c + part_d + part_e + part_f
+    print(f"""
+        price_per_single_piece Formula: part_b + part_c + part_d + part_e + part_f
+        part_b: {part_b},
+        part_c: {part_c},
+        part_d: {part_d},
+        part_e: {part_e},
+        part_f: {part_f},
+        price_per_single_piece: {price_per_single_piece}
+    """)
     
     # Apply final markup to get the final price per piece
     final_price_per_piece = price_per_single_piece * 1.1
-
+    print(f"""
+        final_price_per_piece Formula: price_per_single_piece * 1.1
+        price_per_single_piece: {price_per_single_piece},
+        final_price_per_piece: {final_price_per_piece}
+    """)
+    print("*" * 100)
     return final_price_per_piece
 
 def calculate_all_prices_for_entry(calculation_data, all_material_prices, all_discount_percentages, adjustment_percentage, multiples_value, prodcuts_an_for_entry):
@@ -303,13 +395,23 @@ def render_expanded_layout(entry, i, customer_type, all_tier_discounts, adjustme
         metric_col1, metric_col2, metric_col3 = st.columns(3)
         metric_col1.metric(label="SQ'/piece", value=f"{sqft_per_piece:.2f}")
         metric_col2.metric(label="Total SQ'", value=f"{total_sqft_entry:.2f}")
-        metric_col3.metric(label=f"Applied Price/SQ' ({customer_type})", value=f"${base_price_per_sqft:.2f}")
-        
+        # metric_col3.metric(label=f"Applied Price/SQ' ({customer_type})", value=f"${base_price_per_sqft:.2f}")
+
         st.markdown("---")
-        price_col1, price_col2 = st.columns(2)
-        price_col1.metric(label="BASE AMOUNT", value=f"${active_base_amount:.2f}")
-        price_col2.metric(label="MAX DISCOUNT", value=f"${base_price_per_sqft:.2f}")
+        st.write("Base Amount per SQ' (Before Volume Discounts)")
+        pref_col, corp_col, whole_col = st.columns(3)
+
+        pref_col.metric(label="Preferred Base", value=f"${all_material_prices.get('preferred_base', 0):.2f}")
+        corp_col.metric(label="Corporate Base", value=f"${all_material_prices.get('corporate_base', 0):.2f}")
+        whole_col.metric(label="Wholesale Base", value=f"${all_material_prices.get('wholesale_base', 0):.2f}")
+        
         st.divider()
+        
+        # st.markdown("---")
+        # price_col1, price_col2 = st.columns(2)
+        # price_col1.metric(label="BASE AMOUNT", value=f"${active_base_amount:.2f}")
+        # price_col2.metric(label="MAX DISCOUNT", value=f"${base_price_per_sqft:.2f}")
+        # st.divider()
 
         sc1, sc2, sc3 = st.columns([1, 2, 3])
         sidedness_index = SIDEDNESS_OPTIONS.index(entry.get('sidedness', SIDEDNESS_OPTIONS[0]))

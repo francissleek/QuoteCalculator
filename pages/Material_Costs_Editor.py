@@ -2,8 +2,8 @@ import streamlit as st
 import json
 import os
 
-st.set_page_config(layout="wide", page_title="Admin Panel")
-st.title("Admin Panel - Material & Cost Editor")
+st.set_page_config(layout="wide", page_title="Material & Cost Editor")
+st.title("Material & Cost Editor")
 
 # --- CONFIGURATION LOADER ---
 # This function makes the admin panel self-sufficient.
@@ -58,21 +58,21 @@ if selected_type and selected_material_name:
     with pref_tab:
         st.subheader("Preferred Customer Variables")
         p_data = material_data.get("Preferred", {})
-        p_variable_1 = st.number_input("p_variable_1", value=float(p_data.get("p_variable_1", 0)), format="%.4f", key=f"{selected_material_name}_p1")
-        p_variable_2 = st.number_input("p_variable_2", value=float(p_data.get("p_variable_2", 0)), format="%.4f", key=f"{selected_material_name}_p2")
-        p_discount_value = st.number_input("p_discount_value", value=float(p_data.get("p_discount_value", 0)), format="%.4f", key=f"{selected_material_name}_p_disc")
+        preferred_historical_price = st.number_input("preferred_historical_price", value=float(p_data.get("preferred_historical_price", 0)), format="%.4f", key=f"{selected_material_name}_p1")
+        preferred_fine_tune_modifier = st.number_input("preferred_fine_tune_modifier", value=float(p_data.get("preferred_fine_tune_modifier", 0)), format="%.4f", key=f"{selected_material_name}_p2")
+        preferred_discount_value = st.number_input("preferred_discount_value", value=float(p_data.get("preferred_discount_value", 0)), format="%.4f", key=f"{selected_material_name}_p_disc")
 
     with corp_tab:
         st.subheader("Corporate Customer Variables")
         c_data = material_data.get("Corporate", {})
-        c_variable_1 = st.number_input("c_variable_1", value=float(c_data.get("c_variable_1", 0)), format="%.4f", key=f"{selected_material_name}_c1")
-        c_discount_value = st.number_input("c_discount_value", value=float(c_data.get("c_discount_value", 0)), format="%.4f", key=f"{selected_material_name}_c_disc")
+        corporate_historical_price = st.number_input("corporate_historical_price", value=float(c_data.get("corporate_historical_price", 0)), format="%.4f", key=f"{selected_material_name}_c1")
+        corporate_discount_value = st.number_input("corporate_discount_value", value=float(c_data.get("corporate_discount_value", 0)), format="%.4f", key=f"{selected_material_name}_c_disc")
 
     with wholesale_tab:
         st.subheader("Wholesale Customer Variables")
         w_data = material_data.get("Wholesale", {})
-        w_variable_1 = st.number_input("w_variable_1", value=float(w_data.get("w_variable_1", 0)), format="%.4f", key=f"{selected_material_name}_w1")
-        w_discount_value = st.number_input("w_discount_value", value=float(w_data.get("w_discount_value", 0)), format="%.4f", key=f"{selected_material_name}_w_disc")
+        wholesale_historical_price = st.number_input("wholesale_historical_price", value=float(w_data.get("wholesale_historical_price", 0)), format="%.4f", key=f"{selected_material_name}_w1")
+        wholesale_discount_value = st.number_input("wholesale_discount_value", value=float(w_data.get("wholesale_discount_value", 0)), format="%.4f", key=f"{selected_material_name}_w_disc")
 
     # --- NEW UI for AN Formula Variables ---
     with an_formula_tab:
@@ -96,15 +96,15 @@ if selected_type and selected_material_name:
     with save_col:
         if st.button("Save Changes to Configuration File", use_container_width=True):
             # Update the config dictionary in session state with the new values
-            config['MATERIALS'][selected_type][selected_material_name]['Preferred']['p_variable_1'] = p_variable_1
-            config['MATERIALS'][selected_type][selected_material_name]['Preferred']['p_variable_2'] = p_variable_2
-            config['MATERIALS'][selected_type][selected_material_name]['Preferred']['p_discount_value'] = p_discount_value
+            config['MATERIALS'][selected_type][selected_material_name]['Preferred']['preferred_historical_price'] = preferred_historical_price
+            config['MATERIALS'][selected_type][selected_material_name]['Preferred']['preferred_fine_tune_modifier'] = preferred_fine_tune_modifier
+            config['MATERIALS'][selected_type][selected_material_name]['Preferred']['preferred_discount_value'] = preferred_discount_value
             
-            config['MATERIALS'][selected_type][selected_material_name]['Corporate']['c_variable_1'] = c_variable_1
-            config['MATERIALS'][selected_type][selected_material_name]['Corporate']['c_discount_value'] = c_discount_value
+            config['MATERIALS'][selected_type][selected_material_name]['Corporate']['corporate_historical_price'] = corporate_historical_price
+            config['MATERIALS'][selected_type][selected_material_name]['Corporate']['corporate_discount_value'] = corporate_discount_value
 
-            config['MATERIALS'][selected_type][selected_material_name]['Wholesale']['w_variable_1'] = w_variable_1
-            config['MATERIALS'][selected_type][selected_material_name]['Wholesale']['w_discount_value'] = w_discount_value
+            config['MATERIALS'][selected_type][selected_material_name]['Wholesale']['wholesale_historical_price'] = wholesale_historical_price
+            config['MATERIALS'][selected_type][selected_material_name]['Wholesale']['wholesale_discount_value'] = wholesale_discount_value
             
             # --- SAVE NEW AN FORMULA VARS ---
             if 'prodcuts_an_vars' not in config['MATERIALS'][selected_type][selected_material_name]:
