@@ -154,35 +154,116 @@ def get_banner_mesh_details(sqft, option_details):
             return f"{desc_prefix} - {option_name}", price
     return "N/A", 0.0
 
-def perform_price_calculation(calc_data, customer_type, active_base_amount, discount_percentage, adjustment_percentage, multiples_value, prodcuts_an):
-    entry_quantity = calc_data.get('qty', 1)
-    if entry_quantity == 0: return 0
+# --- NEW CALCULATION LOGIC ---
+def calculate_entry_total(calc_data, customer_type, selected_percentage, adjustment_percentage, multiples_value, prodcuts_an):
+    """Calculates the total for a single line item based on the customer type."""
     multiples_value_for_entry = multiples_value
-    part_a_base = active_base_amount * calc_data['sqft_per_piece'] * calc_data['sides_cost_per_unit']
-    part_a_discounted = part_a_base * (1 - (discount_percentage + adjustment_percentage))
+    entry_total = 0
+    entry_quantity = calc_data.get('qty', 0)
+    if entry_quantity == 0:
+        return 0
+    print(f"--------------------------------------------- {customer_type} ---------------------------------------------")
+    # Part A
+    part_a_base = calc_data['active_base_amount'] * calc_data['sqft_per_piece'] * calc_data['sides_cost_per_unit']
+    print(f"Formula part_a_base: calc_data['active_base_amount'] * calc_data['sqft_per_piece'] * calc_data['sides_cost_per_unit']")
+    print(f"calc_data['active_base_amount'] = {calc_data['active_base_amount']}, calc_data['sqft_per_piece'] = {calc_data['sqft_per_piece']}, calc_data['sides_cost_per_unit'] = {calc_data['sides_cost_per_unit']} = {calc_data['sides_cost_per_unit']}")
+    print(f"part_a_base = {part_a_base}")
+
+    part_a_discounted = part_a_base * (1 - (selected_percentage + adjustment_percentage))
+    print(f"Formula part_a_discounted: part_a_base * (1 - (selected_percentage + adjustment_percentage))")
+    print(f"part_a_base = {part_a_base}, selected_percentage = {selected_percentage}, adjustment_percentage = {adjustment_percentage}")
+    print(f"part_a_discounted = {part_a_discounted}")
+
+    # Part B
     part_b_original = calc_data['cut_cost_per_unit'] * calc_data['sqft_per_piece']
+    print(f"Formula part_b_original: calc_data['cut_cost_per_unit'] * calc_data['sqft_per_piece']")
+    print(f"calc_data['cut_cost_per_unit'] = {calc_data['cut_cost_per_unit']}, calc_data['sqft_per_piece'] = {calc_data['sqft_per_piece']}")
+    print(f"part_b_original = {part_b_original}")
+
     part_b = part_b_original + part_a_discounted
+    print(f"Formula part_b: part_b_original + part_a_discounted")
+    print(f"part_b_original = {part_b_original}, part_a_discounted = {part_a_discounted}")
+    print(f"part_b = {part_b}")
+
+    # Part C - Uses the entry's own quantity
     part_c_numerator = (calc_data['finishing_price_per_unit'] * calc_data['sqft_per_piece'] * entry_quantity) + (prodcuts_an / multiples_value_for_entry)
+    print(f"Formula part_c_numerator: (calc_data['finishing_price_per_unit'] * calc_data['sqft_per_piece'] * entry_quantity) + (prodcuts_an / multiples_value_for_entry)")
+    print(f"prodcuts_an: {prodcuts_an}")
+    print(f"part_c_numerator = {calc_data['finishing_price_per_unit']} * {calc_data['sqft_per_piece']} * {entry_quantity} + {prodcuts_an} / {multiples_value_for_entry}, part_a_discounted = {part_a_discounted}")
+    print(f"part_c_numerator = {part_c_numerator}")
+
     part_c = part_c_numerator / entry_quantity
-    if calc_data['cut_cost_per_unit'] == 0.0: part_d = 0
-    elif customer_type == 'Preferred': part_d = (cons_bx_4 / multiples_value_for_entry) / entry_quantity
-    else: part_d = (cons_bx_4 / multiples_value_for_entry + 0.5) / entry_quantity
-    if calc_data['finishing_price_per_unit'] == 0: part_e = 0
-    else: part_e = (cons_bx_6 / multiples_value_for_entry) / entry_quantity
+    print(f"Formula part_c: part_c_numerator / entry_quantity")
+    print(f"part_c_numerator = {part_c_numerator}, entry_quantity = {entry_quantity}")
+    print(f"={part_c}")
+
+    if calc_data['cut_cost_per_unit'] == 0.0: 
+        part_d = 0
+        print(f"Formula part_d: 0")
+    elif customer_type == 'Preferred':
+        part_d = (cons_bx_4 / multiples_value_for_entry) / entry_quantity
+        print(f"Formula part_d: (cons_bx_4 / multiples_value_for_entry) / entry_quantity")
+        print(f"cons_bx_4 = {cons_bx_4}, multiples_value_for_entry = {multiples_value_for_entry}, entry_quantity = {entry_quantity}")
+        print(f"part_d={part_d}")
+    elif customer_type in ['Corporate', 'Wholesale']:
+        part_d = (cons_bx_4 / (multiples_value_for_entry + 0.5)) / entry_quantity
+        print(f"Formula part_d: (cons_bx_4 / multiples_value_for_entry + 0.5) / entry_quantity")
+        print(f"cons_bx_4 = {cons_bx_4}, multiples_value_for_entry = {multiples_value_for_entry}, entry_quantity = {entry_quantity}")
+        print(f"part_d={part_d}")
+
+    if calc_data['finishing_price_per_unit'] == 0:
+        part_e = 0
+        print(f"Formula part_e: 0")
+    elif customer_type == 'Preferred':
+        part_e = (cons_bx_6 / multiples_value_for_entry) / entry_quantity
+        print(f"Formula part_e: (cons_bx_6 / multiples_value_for_entry) / entry_quantity")
+        print(f"cons_bx_6 = {cons_bx_6}, multiples_value_for_entry = {multiples_value_for_entry}, entry_quantity = {entry_quantity}")
+        print(f"part_e={part_e}")
+    elif customer_type in ['Corporate', 'Wholesale']:
+        part_e = (cons_bx_6 / (multiples_value_for_entry + 0.5)) / entry_quantity
+        print(f"Formula part_e: (cons_bx_6 / multiples_value_for_entry  + 0.5) / entry_quantity")
+        print(f"cons_bx_6 = {cons_bx_6}, multiples_value_for_entry = {multiples_value_for_entry}, entry_quantity = {entry_quantity}")
+        print(f"part_e={part_e}")
+
     part_f = (calc_data['additional_time_cost_per_unit'] / entry_quantity) + calc_data['added_install_cost_per_unit']
+    print(f"Formula part_f: (calc_data['additional_time_cost_per_unit'] / entry_quantity) + calc_data['added_install_cost_per_unit']")
+    print(f"calc_data['additional_time_cost_per_unit'] = {calc_data['additional_time_cost_per_unit']}, entry_quantity = {entry_quantity}")
+    print(f"part_f={part_f}")
+
     price_per_single_piece = part_b + part_c + part_d + part_e + part_f
-    final_price_per_piece = price_per_single_piece * 1.1
-    return final_price_per_piece
+    print(f"Formula price_per_single_piece: part_b + part_c + part_d + part_e + part_f")
+    print(f"part_b = {part_b}, part_c = {part_c}, part_d = {part_d}, part_e = {part_e}, part_f = {part_f}")
+    print(f"price_per_single_piece={price_per_single_piece}")
+
+    entry_total = (price_per_single_piece) * 1.1
+    print(f"Formula entry_total: (price_per_single_piece) * 1.1")
+    print(f"price_per_single_piece = {price_per_single_piece}")
+    return entry_total
 
 def calculate_all_prices_for_entry(calculation_data, all_material_prices, all_discount_percentages, adjustment_percentage, multiples_value, prodcuts_an_for_entry):
     all_prices = {}
+    
     customer_types_map = {
-        'Preferred': {'base': all_material_prices.get('preferred_base', 0), 'discount': all_discount_percentages[0]},
-        'Corporate': {'base': all_material_prices.get('corporate_base', 0), 'discount': all_discount_percentages[1]},
-        'Wholesale': {'base': all_material_prices.get('wholesale_base', 0), 'discount': all_discount_percentages[2]}
+        'Preferred': {'base': all_material_prices.get('preferred_base', 0), 'value': all_material_prices.get('preferred_value', 0), 'discount': all_discount_percentages[0]},
+        'Corporate': {'base': all_material_prices.get('corporate_base', 0), 'value': all_material_prices.get('corporate_value', 0), 'discount': all_discount_percentages[1]},
+        'Wholesale': {'base': all_material_prices.get('wholesale_base', 0), 'value': all_material_prices.get('wholesale_value', 0), 'discount': all_discount_percentages[2]}
     }
+    os.system('cls' if os.name == 'nt' else 'clear')
+
     for cust_type, data in customer_types_map.items():
-        all_prices[cust_type] = perform_price_calculation(calculation_data, cust_type, data['base'], data['discount'], adjustment_percentage, multiples_value, prodcuts_an_for_entry)
+        # Assemble the specific calc_data for this customer type
+        specific_calc_data = calculation_data.copy()
+        specific_calc_data['active_base_amount'] = data['base']
+        specific_calc_data['base_price_per_sqft'] = data['value']
+
+        all_prices[cust_type] = calculate_entry_total(
+            specific_calc_data, 
+            cust_type, 
+            data['discount'], 
+            adjustment_percentage, 
+            multiples_value, 
+            prodcuts_an_for_entry
+        )
     return all_prices
 
 # --- INSTANT UPDATE SOLUTION: Callback Functions ---
@@ -199,16 +280,13 @@ def sync_entry_and_recalculate(entry_id, field_name):
     This is the master callback. It syncs the widget's value to the
     st.session_state.entries list and then triggers the main recalculation.
     """
-    # Find the specific entry in the list by its unique ID
     for entry in st.session_state.entries:
         if entry['id'] == entry_id:
-            # Construct the widget key to get its current value
             widget_key = f"{field_name}_{entry_id}"
             if widget_key in st.session_state:
-                # Manually update the dictionary within the list
                 entry[field_name] = st.session_state[widget_key]
-                # Now that the main state is updated, trigger the global calculation
                 trigger_recalculation()
+                # No st.rerun() here, it will be handled by the main loop check
             break
 
 # --- Layout Rendering Function ---
@@ -217,13 +295,16 @@ def render_expanded_layout(entry, i, total_sqft_order, adjustment_percentage, mu
         st.markdown(f"<a name='entry-{entry['id']}'></a>", unsafe_allow_html=True)
 
         type_col, material_col, remove_col = st.columns([2, 3, 1])
-        # Note: Selectbox changes are handled by the main app loop, but a callback ensures instant refresh
-        with type_col: entry['type'] = st.selectbox("Type", list(MATERIALS.keys()), key=f"type_{entry['id']}", on_change=trigger_recalculation)
+        with type_col:
+            type_options = list(MATERIALS.keys())
+            type_index = type_options.index(entry.get('type', type_options[0]))
+            st.selectbox("Type", type_options, index=type_index, key=f"type_{entry['id']}", on_change=sync_entry_and_recalculate, args=(entry['id'], 'type'))
         with material_col:
             material_options = list(MATERIALS.get(entry['type'], {}).keys())
             if material_options:
                 if entry.get('material') not in material_options: entry['material'] = material_options[0]
-                entry['material'] = st.selectbox("Material", material_options, key=f"material_{entry['id']}", on_change=trigger_recalculation)
+                material_index = material_options.index(entry.get('material', material_options[0]))
+                st.selectbox("Material", material_options, index=material_index, key=f"material_{entry['id']}", on_change=sync_entry_and_recalculate, args=(entry['id'], 'material'))
             else:
                 st.warning(f"No materials for type '{entry['type']}'"); entry['material'] = None
         with remove_col:
@@ -232,7 +313,6 @@ def render_expanded_layout(entry, i, total_sqft_order, adjustment_percentage, mu
                 return "remove_entry", None
 
         dim_col1, dim_col2, dim_col3 = st.columns([2, 2, 2])
-        # --- INSTANT UPDATE: Using the new sync callback ---
         with dim_col1:
             w_ft_col, w_in_col = st.columns(2)
             with w_ft_col: st.number_input("Width (ft)", min_value=0, key=f"w_ft_{entry['id']}", value=entry.get('w_ft', 0), on_change=sync_entry_and_recalculate, args=(entry['id'], 'w_ft'))
@@ -263,11 +343,9 @@ def render_expanded_layout(entry, i, total_sqft_order, adjustment_percentage, mu
         st.markdown("---")
         st.write("Base Amount per SQ' (Before Volume Discounts)")
         pref_col, corp_col, whole_col = st.columns(3)
-
         pref_col.metric(label="Preferred Base", value=f"${all_material_prices.get('preferred_base', 0):.2f}")
         corp_col.metric(label="Corporate Base", value=f"${all_material_prices.get('corporate_base', 0):.2f}")
         whole_col.metric(label="Wholesale Base", value=f"${all_material_prices.get('wholesale_base', 0):.2f}")
-
         st.divider()
 
         st.markdown("##### Volume Discount")
@@ -280,29 +358,17 @@ def render_expanded_layout(entry, i, total_sqft_order, adjustment_percentage, mu
                 default_index = options_list.index(auto_selected_tier)
             except ValueError:
                 default_index = 0
-            
-            selected_tier_description = st.selectbox(
-                "Discount Tier", 
-                options=options_list, 
-                index=default_index, 
-                key=f"discount_tier_{entry['id']}"
-            )
+            selected_tier_description = st.selectbox("Discount Tier", options=options_list, index=default_index, key=f"discount_tier_{entry['id']}")
             selected_tier_discounts = discount_tier_options[selected_tier_description]
-        
         with discount_col2:
             st.write("")
             st.write("")
-            st.info(f"""
-            Discounts Applied:
-            - **Preferred:** `{selected_tier_discounts[0]:.2%}`
-            - **Corporate:** `{selected_tier_discounts[1]:.2%}`
-            - **Wholesale:** `{selected_tier_discounts[2]:.2%}`
-            """)
-        st.markdown("---") 
+            st.info(f"""Discounts Applied:\n- **Preferred:** `{selected_tier_discounts[0]:.2%}`\n- **Corporate:** `{selected_tier_discounts[1]:.2%}`\n- **Wholesale:** `{selected_tier_discounts[2]:.2%}`""")
+        st.markdown("---")
 
         sc1, sc2, sc3 = st.columns([1, 2, 3])
         sidedness_index = SIDEDNESS_OPTIONS.index(entry.get('sidedness', SIDEDNESS_OPTIONS[0]))
-        entry['sidedness'] = sc1.selectbox("Sidedness", options=SIDEDNESS_OPTIONS, key=f"side_{entry['id']}", index=sidedness_index)
+        entry['sidedness'] = sc1.selectbox("Sidedness", options=SIDEDNESS_OPTIONS, index=sidedness_index, key=f"side_{entry['id']}")
         suggested_tier = get_suggested_sides_tier(sqft_per_piece, entry['sidedness'])
         try: tier_index = TIER_DESCRIPTIONS.index(suggested_tier)
         except ValueError: tier_index = 0
@@ -317,7 +383,7 @@ def render_expanded_layout(entry, i, total_sqft_order, adjustment_percentage, mu
         if entry['type'] == "Banner" and entry.get('finishing_type') == 'Nothing Special': entry['finishing_type'] = "Banner/Mesh"
         try: finishing_type_index = FINISHING_TYPES.index(entry.get('finishing_type'))
         except ValueError: finishing_type_index = 0
-        selected_type = fc1.selectbox("Finishing Type", options=FINISHING_TYPES, key=f"fin_type_{entry['id']}", index=finishing_type_index)
+        selected_type = fc1.selectbox("Finishing Type", options=FINISHING_TYPES, index=finishing_type_index, key=f"fin_type_{entry['id']}")
         entry['finishing_type'] = selected_type
         options_for_type = SPECIALTY_FINISHING.get(selected_type, {})
         finishing_price_per_unit = 0
@@ -333,7 +399,7 @@ def render_expanded_layout(entry, i, total_sqft_order, adjustment_percentage, mu
                 fc2.text_input("Finishing Option", value="N/A", key=f"fin_opt_{entry['id']}", disabled=True)
         fc3.metric(label="Finishing Cost/Unit", value=f"${finishing_price_per_unit:.2f}")
 
-        cc1, cc2, _ = st.columns(3) 
+        cc1, cc2, _ = st.columns(3)
         with cc1:
             selected_cut_cost_desc = st.selectbox("Cut Option", options=CUT_COST_OPTIONS, key=f"cut_cost_{entry['id']}")
             entry['cut_cost_selection'] = selected_cut_cost_desc
@@ -341,56 +407,56 @@ def render_expanded_layout(entry, i, total_sqft_order, adjustment_percentage, mu
         with cc2:
             st.metric(label="Cut Cost/Unit", value=f"${cut_cost_per_unit:.2f}")
 
-        at1, at2, _ = st.columns(3) 
+        at1, at2, _ = st.columns(3)
         with at1:
             default_at_index = 0
             if entry.get('additional_time_selection') in ADDITIONAL_TIME_OPTIONS: default_at_index = ADDITIONAL_TIME_OPTIONS.index(entry['additional_time_selection'])
-            selected_at_desc = st.selectbox("Additional Time", options=ADDITIONAL_TIME_OPTIONS, key=f"add_time_{entry['id']}", index=default_at_index)
+            selected_at_desc = st.selectbox("Additional Time", options=ADDITIONAL_TIME_OPTIONS, index=default_at_index, key=f"add_time_{entry['id']}")
             entry['additional_time_selection'] = selected_at_desc
             additional_time_cost_per_unit = ADDITIONAL_TIME_MAP.get(selected_at_desc, 0)
         with at2:
             st.metric(label="Additional Time Cost/Unit", value=f"${additional_time_cost_per_unit:.2f}")
 
-        ai1, ai2, total_col = st.columns(3) 
+        ai1, ai2, total_col = st.columns(3)
         with ai1:
             default_ai_index = 0
             if entry.get('added_install_selection') in ADDED_INSTALL_OPTIONS: default_ai_index = ADDED_INSTALL_OPTIONS.index(entry['added_install_selection'])
-            selected_ai_desc = st.selectbox("Added Install/Item Per Piece", options=ADDED_INSTALL_OPTIONS, key=f"added_install_{entry['id']}", index=default_ai_index)
+            selected_ai_desc = st.selectbox("Added Install/Item Per Piece", options=ADDED_INSTALL_OPTIONS, index=default_ai_index, key=f"added_install_{entry['id']}")
             entry['added_install_selection'] = selected_ai_desc
             added_install_cost_per_unit = ADDED_INSTALL_MAP.get(selected_ai_desc, 0)
         with ai2:
             st.metric(label="Added Install Cost/Unit", value=f"${added_install_cost_per_unit:.2f}")
 
-    export_data = { "Type": entry.get('type'), "Material": entry.get('material'), "Num of pieces": entry.get('qty'), "Width (in)": total_width_inches, "Height (in)": total_height_inches, "SQ' per piece": f"{sqft_per_piece:.2f}", "Total SQ'": f"{total_sqft_entry:.2f}"}
+        export_data = { "Type": entry.get('type'), "Material": entry.get('material'), "Num of pieces": entry.get('qty'), "Width (in)": total_width_inches, "Height (in)": total_height_inches, "SQ' per piece": f"{sqft_per_piece:.2f}", "Total SQ'": f"{total_sqft_entry:.2f}"}
 
-    calculation_data = {
-        "qty": entry.get('qty', 1), "sqft_per_piece": sqft_per_piece, "total_sqft_entry": total_sqft_entry,
-        "sides_cost_per_unit": sides_cost_per_unit, "finishing_price_per_unit": finishing_price_per_unit,
-        "cut_cost_per_unit": cut_cost_per_unit, "additional_time_cost_per_unit": additional_time_cost_per_unit,
-        "added_install_cost_per_unit": added_install_cost_per_unit,
-    }
+        calculation_data = {
+            "qty": entry.get('qty', 1), "sqft_per_piece": sqft_per_piece, "total_sqft_entry": total_sqft_entry,
+            "sides_cost_per_unit": sides_cost_per_unit, "finishing_price_per_unit": finishing_price_per_unit,
+            "cut_cost_per_unit": cut_cost_per_unit, "additional_time_cost_per_unit": additional_time_cost_per_unit,
+            "added_install_cost_per_unit": added_install_cost_per_unit,
+        }
 
-    prodcuts_an_vars = material_data.get("prodcuts_an_vars")
-    if prodcuts_an_vars:
-        _, prodcuts_an_for_entry = calculate_dynamic_prodcuts_an(prodcuts_an_vars, entry.get('qty', 1))
-    else:
-        prodcuts_an_for_entry = default_prodcuts_an
+        prodcuts_an_vars = material_data.get("prodcuts_an_vars")
+        if prodcuts_an_vars:
+            _, prodcuts_an_for_entry = calculate_dynamic_prodcuts_an(prodcuts_an_vars, entry.get('qty', 1))
+        else:
+            prodcuts_an_for_entry = default_prodcuts_an
 
-    entry_prices = calculate_all_prices_for_entry(
-        calculation_data, all_material_prices, selected_tier_discounts,
-        adjustment_percentage, multiples_value, prodcuts_an_for_entry
-    )
+        entry_prices = calculate_all_prices_for_entry(
+            calculation_data, all_material_prices, selected_tier_discounts,
+            adjustment_percentage, multiples_value, prodcuts_an_for_entry
+        )
 
-    with total_col:
-        p_col, c_col, w_col = st.columns(3)
-        with p_col:
-            st.metric(label="Preferred", value=f"${entry_prices.get('Preferred', 0):,.2f}")
-        with c_col:
-            st.metric(label="Corporate", value=f"${entry_prices.get('Corporate', 0):,.2f}")
-        with w_col:
-            st.metric(label="Wholesale", value=f"${entry_prices.get('Wholesale', 0):,.2f}")
+        with total_col:
+            p_col, c_col, w_col = st.columns(3)
+            with p_col:
+                st.metric(label="Preferred", value=f"${entry_prices.get('Preferred', 0):,.2f}")
+            with c_col:
+                st.metric(label="Corporate", value=f"${entry_prices.get('Corporate', 0):,.2f}")
+            with w_col:
+                st.metric(label="Wholesale", value=f"${entry_prices.get('Wholesale', 0):,.2f}")
 
-    return "ok", export_data
+        return "ok", export_data
 
 # --- Initialize session state ---
 if 'entries' not in st.session_state:
@@ -403,13 +469,11 @@ if 'entries' not in st.session_state:
             "additional_time_selection": ADDITIONAL_TIME_OPTIONS[0] if ADDITIONAL_TIME_OPTIONS else None,
             "added_install_selection": ADDED_INSTALL_OPTIONS[0] if ADDED_INSTALL_OPTIONS else None
         })
-# Initialize the total SQFT in session state if it doesn't exist
 if 'total_sqft_order' not in st.session_state:
-    trigger_recalculation() # Calculate it for the first time
+    trigger_recalculation()
 
 # --- SIDEBAR ---
 st.sidebar.header("Quote Summary")
-
 st.sidebar.markdown("#### Print Adjustment")
 adjustment_percentage = 0
 if PRINT_ADJUSTMENT_FIXED:
@@ -419,8 +483,12 @@ if PRINT_ADJUSTMENT_FIXED:
 # --- Main App Logic ---
 data_for_export, all_entry_totals = [], []
 remove_entry_index = None
-
 if not st.session_state.entries: st.warning("No quote entries yet. Click below to add one.")
+
+# This check ensures that if a callback has updated the state, we rerun immediately
+# to show the user the latest, correct information.
+if 'total_sqft_order' in st.session_state and st.session_state.total_sqft_order != sum((((e.get('w_ft', 0) * 12 + e.get('w_in', 0)) * (e.get('h_ft', 0) * 12 + e.get('h_in', 0))) / 144) * e.get('qty', 1) for e in st.session_state.entries):
+    st.rerun()
 
 num_entries = len(st.session_state.entries)
 _, multiples_value = get_multiplier(num_entries)
