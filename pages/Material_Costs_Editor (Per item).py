@@ -2,8 +2,8 @@ import streamlit as st
 import json
 import os
 
-st.set_page_config(layout="wide", page_title="Material & Cost Editor")
-st.title("Material & Cost Editor")
+st.set_page_config(layout="wide", page_title="Material Cost Editor (Per item)")
+st.title("Material Cost Editor (Per item)")
 
 # --- CONFIGURATION LOADER ---
 # This function makes the admin panel self-sufficient.

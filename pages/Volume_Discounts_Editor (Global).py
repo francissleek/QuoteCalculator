@@ -3,8 +3,8 @@ import json
 import os
 
 # --- Page Configuration ---
-st.set_page_config(layout="wide", page_title="Volume Discounts Editor")
-st.title("Volume Discount Tiers")
+st.set_page_config(layout="wide", page_title="Volume Discounts Editor (Global)")
+st.title("Volume Discount Tiers (Global)")
 
 # --- CONFIGURATION LOADER (Consistent with other admin panels) ---
 def load_config(file_path='config.json'):

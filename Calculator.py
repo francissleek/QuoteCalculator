@@ -5,8 +5,8 @@ import json
 import math
 import os
 # --- Page Configuration ---
-st.set_page_config(layout="wide", page_title="Universal Quote Calculator")
-st.title("Universal Quote Calculator")
+st.set_page_config(layout="wide", page_title="Quote Calculator")
+st.title("Quote Calculator")
 
 # --- CONFIGURATION LOADER ---
 def load_config(file_path='config.json'):
@@ -290,7 +290,7 @@ def sync_entry_and_recalculate(entry_id, field_name):
             break
 
 # --- Layout Rendering Function ---
-def render_expanded_layout(entry, i, total_sqft_order, adjustment_percentage, multiples_value):
+def render_expanded_layout(entry, i, total_sqft_order, multiples_value):
     with st.container(border=True):
         st.markdown(f"<a name='entry-{entry['id']}'></a>", unsafe_allow_html=True)
 
@@ -340,31 +340,13 @@ def render_expanded_layout(entry, i, total_sqft_order, adjustment_percentage, mu
         metric_col1.metric(label="SQ'/piece", value=f"{sqft_per_piece:.2f}")
         metric_col2.metric(label="Total SQ'", value=f"{total_sqft_entry:.2f}")
 
-        st.markdown("---")
-        st.write("Base Amount per SQ' (Before Volume Discounts)")
-        pref_col, corp_col, whole_col = st.columns(3)
-        pref_col.metric(label="Preferred Base", value=f"${all_material_prices.get('preferred_base', 0):.2f}")
-        corp_col.metric(label="Corporate Base", value=f"${all_material_prices.get('corporate_base', 0):.2f}")
-        whole_col.metric(label="Wholesale Base", value=f"${all_material_prices.get('wholesale_base', 0):.2f}")
-        st.divider()
-
-        st.markdown("##### Volume Discount")
-        discount_col1, discount_col2 = st.columns([1, 2])
-        with discount_col1:
-            discount_tier_options = {desc: discounts for _, (desc, discounts) in sorted(VOLUME_DISCOUNT_TIERS.items())}
-            options_list = list(discount_tier_options.keys())
-            auto_selected_tier = get_discount_tier_details(total_sqft_order, VOLUME_DISCOUNT_TIERS)
-            try:
-                default_index = options_list.index(auto_selected_tier)
-            except ValueError:
-                default_index = 0
-            selected_tier_description = st.selectbox("Discount Tier", options=options_list, index=default_index, key=f"discount_tier_{entry['id']}")
-            selected_tier_discounts = discount_tier_options[selected_tier_description]
-        with discount_col2:
-            st.write("")
-            st.write("")
-            st.info(f"""Discounts Applied:\n- **Preferred:** `{selected_tier_discounts[0]:.2%}`\n- **Corporate:** `{selected_tier_discounts[1]:.2%}`\n- **Wholesale:** `{selected_tier_discounts[2]:.2%}`""")
-        st.markdown("---")
+        # st.markdown("---")
+        # st.write("Base Amount per SQ' (Before Volume Discounts)")
+        # pref_col, corp_col, whole_col = st.columns(3)
+        # pref_col.metric(label="Preferred Base", value=f"${all_material_prices.get('preferred_base', 0):.2f}")
+        # corp_col.metric(label="Corporate Base", value=f"${all_material_prices.get('corporate_base', 0):.2f}")
+        # whole_col.metric(label="Wholesale Base", value=f"${all_material_prices.get('wholesale_base', 0):.2f}")
+        # st.divider()
 
         sc1, sc2, sc3 = st.columns([1, 2, 3])
         sidedness_index = SIDEDNESS_OPTIONS.index(entry.get('sidedness', SIDEDNESS_OPTIONS[0]))
@@ -417,7 +399,7 @@ def render_expanded_layout(entry, i, total_sqft_order, adjustment_percentage, mu
         with at2:
             st.metric(label="Additional Time Cost/Unit", value=f"${additional_time_cost_per_unit:.2f}")
 
-        ai1, ai2, total_col = st.columns(3)
+        ai1, ai2 = st.columns(2)
         with ai1:
             default_ai_index = 0
             if entry.get('added_install_selection') in ADDED_INSTALL_OPTIONS: default_ai_index = ADDED_INSTALL_OPTIONS.index(entry['added_install_selection'])
@@ -436,6 +418,56 @@ def render_expanded_layout(entry, i, total_sqft_order, adjustment_percentage, mu
             "added_install_cost_per_unit": added_install_cost_per_unit,
         }
 
+
+        # --- ADDED: Per-entry Print Adjustment ---
+        # st.markdown("##### Print Adjustment")
+        adj_col1, adj_col2 = st.columns([1, 2])
+        with adj_col1:
+            def format_adjustment_option(name):
+                value = PRINT_ADJUSTMENT_FIXED[name]
+                return f"{name} ({value:+.2%})"
+            
+            options = list(PRINT_ADJUSTMENT_FIXED.keys())
+            default_adj = entry.get('print_adjustment', options[0])
+            adj_index = options.index(default_adj) if default_adj in options else 0
+
+            selected_adjustment_label = st.selectbox(
+                "Select Adjustment", 
+                options=options,
+                index=adj_index,
+                format_func=format_adjustment_option,
+                key=f"adjustment_{entry['id']}"
+            )
+            entry['print_adjustment'] = selected_adjustment_label
+            adjustment_percentage = PRINT_ADJUSTMENT_FIXED[selected_adjustment_label]
+        # with adj_col2:
+        #     st.write("") # Spacer
+        # st.markdown("---")
+        # --- END Per-entry Print Adjustment ---
+
+
+        # st.markdown("##### Volume Discount")
+        discount_col1, discount_col2 = st.columns([1, 2])
+        with discount_col1:
+            discount_tier_options = {desc: discounts for _, (desc, discounts) in sorted(VOLUME_DISCOUNT_TIERS.items())}
+            options_list = list(discount_tier_options.keys())
+            auto_selected_tier = get_discount_tier_details(total_sqft_order, VOLUME_DISCOUNT_TIERS)
+            try:
+                default_index = options_list.index(auto_selected_tier)
+            except ValueError:
+                default_index = 0
+            selected_tier_description = st.selectbox("Discount Tier", options=options_list, index=default_index, key=f"discount_tier_{entry['id']}")
+            selected_tier_discounts = discount_tier_options[selected_tier_description]
+       
+        with discount_col2:
+            st.write("")
+            st.write("")
+            st.info(f"""Discounts Applied:\n- **Preferred:** `{selected_tier_discounts[0]:.2%}`\n- **Corporate:** `{selected_tier_discounts[1]:.2%}`\n- **Wholesale:** `{selected_tier_discounts[2]:.2%}`""")
+        st.markdown("---")
+        
+
+
+
         prodcuts_an_vars = material_data.get("prodcuts_an_vars")
         if prodcuts_an_vars:
             _, prodcuts_an_for_entry = calculate_dynamic_prodcuts_an(prodcuts_an_vars, entry.get('qty', 1))
@@ -447,14 +479,13 @@ def render_expanded_layout(entry, i, total_sqft_order, adjustment_percentage, mu
             adjustment_percentage, multiples_value, prodcuts_an_for_entry
         )
 
-        with total_col:
-            p_col, c_col, w_col = st.columns(3)
-            with p_col:
-                st.metric(label="Preferred", value=f"${entry_prices.get('Preferred', 0):,.2f}")
-            with c_col:
-                st.metric(label="Corporate", value=f"${entry_prices.get('Corporate', 0):,.2f}")
-            with w_col:
-                st.metric(label="Wholesale", value=f"${entry_prices.get('Wholesale', 0):,.2f}")
+        p_col, c_col, w_col = st.columns(3)
+        with p_col:
+            st.metric(label="Preferred", value=f"${entry_prices.get('Preferred', 0):,.2f}")
+        with c_col:
+            st.metric(label="Corporate", value=f"${entry_prices.get('Corporate', 0):,.2f}")
+        with w_col:
+            st.metric(label="Wholesale", value=f"${entry_prices.get('Wholesale', 0):,.2f}")
 
         return "ok", export_data
 
@@ -467,18 +498,15 @@ if 'entries' not in st.session_state:
             "w_ft": 0,"w_in": 0,"h_ft": 0,"h_in": 0,"qty": 1,
             "sidedness": "Single Sided", "finishing_type": "Nothing Special", "cut_cost_selection": "NO CUT",
             "additional_time_selection": ADDITIONAL_TIME_OPTIONS[0] if ADDITIONAL_TIME_OPTIONS else None,
-            "added_install_selection": ADDED_INSTALL_OPTIONS[0] if ADDED_INSTALL_OPTIONS else None
+            "added_install_selection": ADDED_INSTALL_OPTIONS[0] if ADDED_INSTALL_OPTIONS else None,
+            "print_adjustment": list(PRINT_ADJUSTMENT_FIXED.keys())[0] if PRINT_ADJUSTMENT_FIXED else None
         })
 if 'total_sqft_order' not in st.session_state:
     trigger_recalculation()
 
-# --- SIDEBAR ---
-st.sidebar.header("Quote Summary")
-st.sidebar.markdown("#### Print Adjustment")
-adjustment_percentage = 0
-if PRINT_ADJUSTMENT_FIXED:
-    selected_adjustment_label = st.sidebar.selectbox("Select Adjustment", options=list(PRINT_ADJUSTMENT_FIXED.keys()))
-    adjustment_percentage = PRINT_ADJUSTMENT_FIXED[selected_adjustment_label]
+
+st.sidebar.header("Entries")
+# st.sidebar.divider()
 
 # --- Main App Logic ---
 data_for_export, all_entry_totals = [], []
@@ -487,7 +515,9 @@ if not st.session_state.entries: st.warning("No quote entries yet. Click below t
 
 # This check ensures that if a callback has updated the state, we rerun immediately
 # to show the user the latest, correct information.
-if 'total_sqft_order' in st.session_state and st.session_state.total_sqft_order != sum((((e.get('w_ft', 0) * 12 + e.get('w_in', 0)) * (e.get('h_ft', 0) * 12 + e.get('h_in', 0))) / 144) * e.get('qty', 1) for e in st.session_state.entries):
+current_total_sqft = sum((((e.get('w_ft', 0) * 12 + e.get('w_in', 0)) * (e.get('h_ft', 0) * 12 + e.get('h_in', 0))) / 144) * e.get('qty', 1) for e in st.session_state.entries)
+if st.session_state.get('total_sqft_order', -1) != current_total_sqft:
+    trigger_recalculation()
     st.rerun()
 
 num_entries = len(st.session_state.entries)
@@ -495,8 +525,9 @@ _, multiples_value = get_multiplier(num_entries)
 total_sqft_order = st.session_state.get('total_sqft_order', 0)
 
 for i, entry in enumerate(st.session_state.entries):
+    # --- MODIFIED: Removed adjustment_percentage from arguments ---
     status, export_data = render_expanded_layout(
-        entry, i, total_sqft_order, adjustment_percentage, multiples_value
+        entry, i, total_sqft_order, multiples_value
     )
     if status == "remove_entry": remove_entry_index = i
     else:
@@ -515,7 +546,8 @@ if st.button("➕ Add New Entry", use_container_width=True):
             "w_ft": 0, "w_in": 0, "h_ft": 0, "h_in": 0, "qty": 1,
             "sidedness": "Single Sided", "finishing_type": "Nothing Special", "cut_cost_selection": "NO CUT",
             "additional_time_selection": ADDITIONAL_TIME_OPTIONS[0] if ADDITIONAL_TIME_OPTIONS else None,
-            "added_install_selection": ADDED_INSTALL_OPTIONS[0] if ADDED_INSTALL_OPTIONS else None
+            "added_install_selection": ADDED_INSTALL_OPTIONS[0] if ADDED_INSTALL_OPTIONS else None,
+            "print_adjustment": list(PRINT_ADJUSTMENT_FIXED.keys())[0] if PRINT_ADJUSTMENT_FIXED else None
         })
         trigger_recalculation()
         st.rerun()
