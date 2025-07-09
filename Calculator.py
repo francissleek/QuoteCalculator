@@ -440,30 +440,31 @@ def render_expanded_layout(entry, i, total_sqft_order, multiples_value):
             )
             entry['print_adjustment'] = selected_adjustment_label
             adjustment_percentage = PRINT_ADJUSTMENT_FIXED[selected_adjustment_label]
-        # with adj_col2:
-        #     st.write("") # Spacer
-        # st.markdown("---")
+            
+        with adj_col2:
+             # st.markdown("##### Volume Discount")
+            discount_col1, discount_col2 = st.columns([1, 2])
+            with discount_col1:
+                discount_tier_options = {desc: discounts for _, (desc, discounts) in sorted(VOLUME_DISCOUNT_TIERS.items())}
+                options_list = list(discount_tier_options.keys())
+                auto_selected_tier = get_discount_tier_details(total_sqft_order, VOLUME_DISCOUNT_TIERS)
+                try:
+                    default_index = options_list.index(auto_selected_tier)
+                except ValueError:
+                    default_index = 0
+                selected_tier_description = st.selectbox("Discount Tier", options=options_list, index=default_index, key=f"discount_tier_{entry['id']}")
+                selected_tier_discounts = discount_tier_options[selected_tier_description]
+        
+        st.markdown("---")
         # --- END Per-entry Print Adjustment ---
 
 
-        # st.markdown("##### Volume Discount")
-        discount_col1, discount_col2 = st.columns([1, 2])
-        with discount_col1:
-            discount_tier_options = {desc: discounts for _, (desc, discounts) in sorted(VOLUME_DISCOUNT_TIERS.items())}
-            options_list = list(discount_tier_options.keys())
-            auto_selected_tier = get_discount_tier_details(total_sqft_order, VOLUME_DISCOUNT_TIERS)
-            try:
-                default_index = options_list.index(auto_selected_tier)
-            except ValueError:
-                default_index = 0
-            selected_tier_description = st.selectbox("Discount Tier", options=options_list, index=default_index, key=f"discount_tier_{entry['id']}")
-            selected_tier_discounts = discount_tier_options[selected_tier_description]
        
-        with discount_col2:
-            st.write("")
-            st.write("")
-            st.info(f"""Discounts Applied:\n- **Preferred:** `{selected_tier_discounts[0]:.2%}`\n- **Corporate:** `{selected_tier_discounts[1]:.2%}`\n- **Wholesale:** `{selected_tier_discounts[2]:.2%}`""")
-        st.markdown("---")
+        # with discount_col2:
+        #     st.write("")
+        #     st.write("")
+        #     st.info(f"""Discounts Applied:\n- **Preferred:** `{selected_tier_discounts[0]:.2%}`\n- **Corporate:** `{selected_tier_discounts[1]:.2%}`\n- **Wholesale:** `{selected_tier_discounts[2]:.2%}`""")
+        # st.markdown("---")
         
 
 
@@ -479,13 +480,17 @@ def render_expanded_layout(entry, i, total_sqft_order, multiples_value):
             adjustment_percentage, multiples_value, prodcuts_an_for_entry
         )
 
+        preferred_label = f"Preferred ({selected_tier_discounts[0]:.2%})"
+        corporate_label = f"Corporate ({selected_tier_discounts[1]:.2%})"
+        wholesale_label = f"Wholesale ({selected_tier_discounts[2]:.2%})"
+
         p_col, c_col, w_col = st.columns(3)
         with p_col:
-            st.metric(label="Preferred", value=f"${entry_prices.get('Preferred', 0):,.2f}")
+            st.metric(label=preferred_label, value=f"${entry_prices.get('Preferred', 0):,.2f}")
         with c_col:
-            st.metric(label="Corporate", value=f"${entry_prices.get('Corporate', 0):,.2f}")
+            st.metric(label=corporate_label, value=f"${entry_prices.get('Corporate', 0):,.2f}")
         with w_col:
-            st.metric(label="Wholesale", value=f"${entry_prices.get('Wholesale', 0):,.2f}")
+            st.metric(label=wholesale_label, value=f"${entry_prices.get('Wholesale', 0):,.2f}")
 
         return "ok", export_data
 
