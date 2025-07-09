@@ -4,8 +4,40 @@ import pandas as pd
 import json
 import math
 import os
-# --- Page Configuration ---
+from collections import Counter
+
+# --- Page Configuration (BEST PRACTICE FIX: Must be the first st command) ---
 st.set_page_config(layout="wide", page_title="Quote Calculator")
+
+st.markdown("""
+<style>
+    /* Target all widget labels */
+    .st-emotion-cache-ue6h4q {
+        font-size: 14px;
+    }
+    /* Target the text inside all selectboxes */
+    .stSelectbox div[data-baseweb="select"] > div {
+        font-size: 14px;
+    }
+    /* Target the text inside all number inputs */
+    .st-emotion-cache-12h6tpf {
+        font-size: 14px;
+    }
+    /* Target the "Total SQ' IN ORDER" metric label */
+    .st-emotion-cache-1g8sf3i {
+        font-size: 14px;
+    }
+    /* Target the main metric labels (e.g., "Preferred (36.00%)") */
+    div[data-testid="stMetricLabel"] {
+        font-size: 13px;
+    }
+    div[data-testid="stMetricValue"] {
+        font-size: 15px;
+    }
+</style>
+""", unsafe_allow_html=True)
+
+
 st.title("Quote Calculator")
 
 # --- CONFIGURATION LOADER ---
@@ -197,7 +229,7 @@ def calculate_entry_total(calc_data, customer_type, selected_percentage, adjustm
     print(f"part_c_numerator = {part_c_numerator}, entry_quantity = {entry_quantity}")
     print(f"={part_c}")
 
-    if calc_data['cut_cost_per_unit'] == 0.0: 
+    if calc_data['cut_cost_per_unit'] == 0.0:
         part_d = 0
         print(f"Formula part_d: 0")
     elif customer_type == 'Preferred':
@@ -242,7 +274,7 @@ def calculate_entry_total(calc_data, customer_type, selected_percentage, adjustm
 
 def calculate_all_prices_for_entry(calculation_data, all_material_prices, all_discount_percentages, adjustment_percentage, multiples_value, prodcuts_an_for_entry):
     all_prices = {}
-    
+
     customer_types_map = {
         'Preferred': {'base': all_material_prices.get('preferred_base', 0), 'value': all_material_prices.get('preferred_value', 0), 'discount': all_discount_percentages[0]},
         'Corporate': {'base': all_material_prices.get('corporate_base', 0), 'value': all_material_prices.get('corporate_value', 0), 'discount': all_discount_percentages[1]},
@@ -257,11 +289,11 @@ def calculate_all_prices_for_entry(calculation_data, all_material_prices, all_di
         specific_calc_data['base_price_per_sqft'] = data['value']
 
         all_prices[cust_type] = calculate_entry_total(
-            specific_calc_data, 
-            cust_type, 
-            data['discount'], 
-            adjustment_percentage, 
-            multiples_value, 
+            specific_calc_data,
+            cust_type,
+            data['discount'],
+            adjustment_percentage,
+            multiples_value,
             prodcuts_an_for_entry
         )
     return all_prices
@@ -290,8 +322,19 @@ def sync_entry_and_recalculate(entry_id, field_name):
             break
 
 # --- Layout Rendering Function ---
-def render_expanded_layout(entry, i, total_sqft_order, multiples_value):
-    with st.container(border=True):
+### MODIFIED: Added 'is_last_entry' parameter to the function signature
+def render_expanded_layout(entry, i, total_sqft_order, multiples_value, multiples_label, is_last_entry):
+    ### ADDED: Logic to create a summary label for the expander
+    material_name = entry.get('material', 'New Entry')
+    w_ft = entry.get('w_ft', 0)
+    w_in = entry.get('w_in', 0)
+    h_ft = entry.get('h_ft', 0)
+    h_in = entry.get('h_in', 0)
+    qty = entry.get('qty', 1)
+    summary_label = f"#{i+1}: {material_name} — {w_ft}' {w_in}\" x {h_ft}' {h_in}\" (Qty: {qty})"
+
+    ### MODIFIED: Replaced st.container with st.expander
+    with st.expander(summary_label, expanded=is_last_entry):
         st.markdown(f"<a name='entry-{entry['id']}'></a>", unsafe_allow_html=True)
 
         type_col, material_col, remove_col = st.columns([2, 3, 1])
@@ -358,7 +401,7 @@ def render_expanded_layout(entry, i, total_sqft_order, multiples_value):
         selected_tier_desc = sc2.selectbox("Tier", options=TIER_DESCRIPTIONS, index=tier_index, key=f"sides_tier_{entry['id']}", format_func=format_tier_option)
         entry['sides_tier_selection'] = selected_tier_desc
         sides_cost_per_unit = SIDES_TIERS_MAP.get(selected_tier_desc, 0)
-        sc3.metric(label="Sides Cost/Unit", value=f"${sides_cost_per_unit:.2f}")
+        # sc3.metric(label="Sides Cost/Unit", value=f"${sides_cost_per_unit:.2f}")
 
         fc1, fc2, fc3 = st.columns(3)
         if entry.get('finishing_type') is None: entry['finishing_type'] = 'Nothing Special'
@@ -383,31 +426,98 @@ def render_expanded_layout(entry, i, total_sqft_order, multiples_value):
 
         cc1, cc2, _ = st.columns(3)
         with cc1:
-            selected_cut_cost_desc = st.selectbox("Cut Option", options=CUT_COST_OPTIONS, key=f"cut_cost_{entry['id']}")
+            def format_cut_option(option_name):
+                price = CUT_COST_MAP.get(option_name, 0)
+                return f"{option_name} - ${price:.2f}"
+
+            selected_cut_cost_desc = st.selectbox(
+                "Cut Option", 
+                options=CUT_COST_OPTIONS, 
+                key=f"cut_cost_{entry['id']}",
+                format_func=format_cut_option  # Add this line
+            )
             entry['cut_cost_selection'] = selected_cut_cost_desc
             cut_cost_per_unit = CUT_COST_MAP.get(selected_cut_cost_desc, 0)
         with cc2:
-            st.metric(label="Cut Cost/Unit", value=f"${cut_cost_per_unit:.2f}")
+            def format_time_option(option_name):
+                price = ADDITIONAL_TIME_MAP.get(option_name, 0)
+                return f"{option_name} - ${price:.2f}"
 
-        at1, at2, _ = st.columns(3)
-        with at1:
             default_at_index = 0
-            if entry.get('additional_time_selection') in ADDITIONAL_TIME_OPTIONS: default_at_index = ADDITIONAL_TIME_OPTIONS.index(entry['additional_time_selection'])
-            selected_at_desc = st.selectbox("Additional Time", options=ADDITIONAL_TIME_OPTIONS, index=default_at_index, key=f"add_time_{entry['id']}")
+            if entry.get('additional_time_selection') in ADDITIONAL_TIME_OPTIONS:
+                default_at_index = ADDITIONAL_TIME_OPTIONS.index(entry['additional_time_selection'])
+
+            selected_at_desc = st.selectbox(
+                "Additional Time",
+                options=ADDITIONAL_TIME_OPTIONS,
+                index=default_at_index,
+                key=f"add_time_{entry['id']}",
+                format_func=format_time_option
+            )
             entry['additional_time_selection'] = selected_at_desc
             additional_time_cost_per_unit = ADDITIONAL_TIME_MAP.get(selected_at_desc, 0)
-        with at2:
-            st.metric(label="Additional Time Cost/Unit", value=f"${additional_time_cost_per_unit:.2f}")
+                
+
+        # at1, at2, _ = st.columns(3)
+        # with at1:
+        #     def format_time_option(option_name):
+        #         price = ADDITIONAL_TIME_MAP.get(option_name, 0)
+        #         return f"{option_name} - ${price:.2f}"
+
+        #     default_at_index = 0
+        #     if entry.get('additional_time_selection') in ADDITIONAL_TIME_OPTIONS:
+        #         default_at_index = ADDITIONAL_TIME_OPTIONS.index(entry['additional_time_selection'])
+
+        #     selected_at_desc = st.selectbox(
+        #         "Additional Time",
+        #         options=ADDITIONAL_TIME_OPTIONS,
+        #         index=default_at_index,
+        #         key=f"add_time_{entry['id']}",
+        #         format_func=format_time_option
+        #     )
+        #     entry['additional_time_selection'] = selected_at_desc
+        #     additional_time_cost_per_unit = ADDITIONAL_TIME_MAP.get(selected_at_desc, 0)
+        # with at2:
+        #     st.metric(label="Additional Time Cost/Unit", value=f"${additional_time_cost_per_unit:.2f}")
 
         ai1, ai2 = st.columns(2)
         with ai1:
+            def format_install_option(option_name):
+                price = ADDED_INSTALL_MAP.get(option_name, 0)
+                return f"{option_name} - ${price:.2f}"
+
             default_ai_index = 0
-            if entry.get('added_install_selection') in ADDED_INSTALL_OPTIONS: default_ai_index = ADDED_INSTALL_OPTIONS.index(entry['added_install_selection'])
-            selected_ai_desc = st.selectbox("Added Install/Item Per Piece", options=ADDED_INSTALL_OPTIONS, index=default_ai_index, key=f"added_install_{entry['id']}")
+            if entry.get('added_install_selection') in ADDED_INSTALL_OPTIONS:
+                default_ai_index = ADDED_INSTALL_OPTIONS.index(entry['added_install_selection'])
+                
+            selected_ai_desc = st.selectbox(
+                "Added Install/Item Per Piece",
+                options=ADDED_INSTALL_OPTIONS,
+                index=default_ai_index,
+                key=f"added_install_{entry['id']}",
+                format_func=format_install_option
+            )
             entry['added_install_selection'] = selected_ai_desc
             added_install_cost_per_unit = ADDED_INSTALL_MAP.get(selected_ai_desc, 0)
         with ai2:
-            st.metric(label="Added Install Cost/Unit", value=f"${added_install_cost_per_unit:.2f}")
+            #st.metric(label="Added Install Cost/Unit", value=f"${added_install_cost_per_unit:.2f}")
+            def format_adjustment_option(name):
+                value = PRINT_ADJUSTMENT_FIXED[name]
+                return f"{name} ({value:+.2%})"
+
+            options = list(PRINT_ADJUSTMENT_FIXED.keys())
+            default_adj = entry.get('print_adjustment', options[0])
+            adj_index = options.index(default_adj) if default_adj in options else 0
+
+            selected_adjustment_label = st.selectbox(
+                "Select Adjustment",
+                options=options,
+                index=adj_index,
+                format_func=format_adjustment_option,
+                key=f"adjustment_{entry['id']}"
+            )
+            entry['print_adjustment'] = selected_adjustment_label
+            adjustment_percentage = PRINT_ADJUSTMENT_FIXED[selected_adjustment_label]
 
         export_data = { "Type": entry.get('type'), "Material": entry.get('material'), "Num of pieces": entry.get('qty'), "Width (in)": total_width_inches, "Height (in)": total_height_inches, "SQ' per piece": f"{sqft_per_piece:.2f}", "Total SQ'": f"{total_sqft_entry:.2f}"}
 
@@ -421,53 +531,61 @@ def render_expanded_layout(entry, i, total_sqft_order, multiples_value):
 
         # --- ADDED: Per-entry Print Adjustment ---
         # st.markdown("##### Print Adjustment")
-        adj_col1, adj_col2 = st.columns([1, 2])
-        with adj_col1:
-            def format_adjustment_option(name):
-                value = PRINT_ADJUSTMENT_FIXED[name]
-                return f"{name} ({value:+.2%})"
-            
-            options = list(PRINT_ADJUSTMENT_FIXED.keys())
-            default_adj = entry.get('print_adjustment', options[0])
-            adj_index = options.index(default_adj) if default_adj in options else 0
+        # adj_col1, adj_col2 = st.columns([1, 2])
+        # with adj_col1:
+        #     def format_adjustment_option(name):
+        #         value = PRINT_ADJUSTMENT_FIXED[name]
+        #         return f"{name} ({value:+.2%})"
 
-            selected_adjustment_label = st.selectbox(
-                "Select Adjustment", 
-                options=options,
-                index=adj_index,
-                format_func=format_adjustment_option,
-                key=f"adjustment_{entry['id']}"
-            )
-            entry['print_adjustment'] = selected_adjustment_label
-            adjustment_percentage = PRINT_ADJUSTMENT_FIXED[selected_adjustment_label]
+        #     options = list(PRINT_ADJUSTMENT_FIXED.keys())
+        #     default_adj = entry.get('print_adjustment', options[0])
+        #     adj_index = options.index(default_adj) if default_adj in options else 0
+
+        #     selected_adjustment_label = st.selectbox(
+        #         "Select Adjustment",
+        #         options=options,
+        #         index=adj_index,
+        #         format_func=format_adjustment_option,
+        #         key=f"adjustment_{entry['id']}"
+        #     )
+        #     entry['print_adjustment'] = selected_adjustment_label
+        #     adjustment_percentage = PRINT_ADJUSTMENT_FIXED[selected_adjustment_label]
+
+        # with adj_col2:
+        # st.markdown("##### Volume Discount")
+        discount_col1, discount_col2 = st.columns([1, 2])
+        with discount_col1:
+            discount_tier_options = {desc: discounts for _, (desc, discounts) in sorted(VOLUME_DISCOUNT_TIERS.items())}
+            options_list = list(discount_tier_options.keys())
+
+            # Define the function to format the display text
+            def format_discount_tier(description):
+                discounts = discount_tier_options.get(description, [0, 0, 0])
+                p_disc, c_disc, w_disc = discounts[0], discounts[1], discounts[2]
+                return f"{description} (P:{p_disc:.1%} | C:{c_disc:.1%} | W:{w_disc:.1%})"
+
+            auto_selected_tier = get_discount_tier_details(total_sqft_order, VOLUME_DISCOUNT_TIERS)
+            try:
+                default_index = options_list.index(auto_selected_tier)
+            except ValueError:
+                default_index = 0
             
-        with adj_col2:
-             # st.markdown("##### Volume Discount")
-            discount_col1, discount_col2 = st.columns([1, 2])
-            with discount_col1:
-                discount_tier_options = {desc: discounts for _, (desc, discounts) in sorted(VOLUME_DISCOUNT_TIERS.items())}
-                options_list = list(discount_tier_options.keys())
-                auto_selected_tier = get_discount_tier_details(total_sqft_order, VOLUME_DISCOUNT_TIERS)
-                try:
-                    default_index = options_list.index(auto_selected_tier)
-                except ValueError:
-                    default_index = 0
-                selected_tier_description = st.selectbox("Discount Tier", options=options_list, index=default_index, key=f"discount_tier_{entry['id']}")
-                selected_tier_discounts = discount_tier_options[selected_tier_description]
-        
-        st.markdown("---")
+            selected_tier_description = st.selectbox(
+                "Discount Tier", 
+                options=options_list, 
+                index=default_index, 
+                key=f"discount_tier_{entry['id']}",
+                format_func=format_discount_tier # This formats the display
+            )
+            selected_tier_discounts = discount_tier_options[selected_tier_description]
+
         # --- END Per-entry Print Adjustment ---
 
-
-       
         # with discount_col2:
         #     st.write("")
         #     st.write("")
         #     st.info(f"""Discounts Applied:\n- **Preferred:** `{selected_tier_discounts[0]:.2%}`\n- **Corporate:** `{selected_tier_discounts[1]:.2%}`\n- **Wholesale:** `{selected_tier_discounts[2]:.2%}`""")
         # st.markdown("---")
-        
-
-
 
         prodcuts_an_vars = material_data.get("prodcuts_an_vars")
         if prodcuts_an_vars:
@@ -479,6 +597,9 @@ def render_expanded_layout(entry, i, total_sqft_order, multiples_value):
             calculation_data, all_material_prices, selected_tier_discounts,
             adjustment_percentage, multiples_value, prodcuts_an_for_entry
         )
+        
+        # Display the per-entry multiplier
+        st.metric(label=f"Material Multiplier ({multiples_label})", value=f"x{multiples_value}")
 
         preferred_label = f"Preferred ({selected_tier_discounts[0]:.2%})"
         corporate_label = f"Corporate ({selected_tier_discounts[1]:.2%})"
@@ -509,7 +630,6 @@ if 'entries' not in st.session_state:
 if 'total_sqft_order' not in st.session_state:
     trigger_recalculation()
 
-
 st.sidebar.header("Entries")
 # st.sidebar.divider()
 
@@ -525,14 +645,23 @@ if st.session_state.get('total_sqft_order', -1) != current_total_sqft:
     trigger_recalculation()
     st.rerun()
 
-num_entries = len(st.session_state.entries)
-_, multiples_value = get_multiplier(num_entries)
+# Count occurrences of each material type
+material_type_counts = Counter(e.get('material') for e in st.session_state.entries)
 total_sqft_order = st.session_state.get('total_sqft_order', 0)
 
 for i, entry in enumerate(st.session_state.entries):
-    # --- MODIFIED: Removed adjustment_percentage from arguments ---
+    # Get the count for the current entry's material
+    material_count = material_type_counts.get(entry.get('material'), 1)
+    
+    # Find the specific multiplier and its label for this entry
+    multiples_label, multiples_value = get_multiplier(material_count)
+
+    ### MODIFIED: Check if the current entry is the last one in the list
+    is_last_entry = (i == len(st.session_state.entries) - 1)
+
+    ### MODIFIED: Pass the is_last_entry flag to the rendering function
     status, export_data = render_expanded_layout(
-        entry, i, total_sqft_order, multiples_value
+        entry, i, total_sqft_order, multiples_value, multiples_label, is_last_entry
     )
     if status == "remove_entry": remove_entry_index = i
     else:
@@ -560,11 +689,16 @@ if st.button("➕ Add New Entry", use_container_width=True):
 # --- SIDEBAR FINAL DISPLAY ---
 with st.sidebar.expander("Go to Entry...", expanded=True):
     for i, entry in enumerate(st.session_state.entries):
-        material = entry.get('material', 'N/A')
+        # Get the full material name
+        full_material_name = entry.get('material', 'N/A')
+
+        # Truncate the name if it's longer than 20 characters
+        material = (full_material_name[:10] + '...') if len(full_material_name) > 20 else full_material_name
+        
+        # Create the summary text with the (potentially truncated) name
         summary_text = f"**{material}**: {entry.get('w_ft', 0)}' {entry.get('w_in', 0)}\" x {entry.get('h_ft', 0)}' {entry.get('h_in', 0)}\" (Qty: {entry.get('qty', 1)})"
         st.markdown(f"[{summary_text}](#entry-{entry['id']})", unsafe_allow_html=True)
 
 st.sidebar.divider()
 st.sidebar.metric(label="TOTAL SQ' IN ORDER", value=f"{st.session_state.total_sqft_order:.2f}")
 st.sidebar.divider()
-st.sidebar.metric(label=f"Multiplier ({get_multiplier(num_entries)[0]})", value=f"x{multiples_value}")
