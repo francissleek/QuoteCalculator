@@ -5,7 +5,7 @@ import json
 import math
 import os
 from collections import Counter
-
+os.environ.setdefault('TERM', 'xterm')
 # --- Page Configuration (BEST PRACTICE FIX: Must be the first st command) ---
 st.set_page_config(layout="wide", page_title="Quote Calculator")
 
