@@ -333,8 +333,10 @@ def render_expanded_layout(entry, i, total_sqft_order, multiples_value, multiple
 
         material_data = {}
         all_material_prices = {}
+        print(f"ayoooooooooooooo material_data: {entry.get('material')}")
         if entry.get('material'):
             material_data = MATERIALS.get(entry['type'], {}).get(entry['material'], {})
+            
             if material_data:
                 all_material_prices = calculate_material_price(material_data)
 
@@ -552,7 +554,6 @@ def render_expanded_layout(entry, i, total_sqft_order, multiples_value, multiple
         else:
             prodcuts_an_for_entry = default_prodcuts_an
 
-        print(f"")
         entry_prices = calculate_all_prices_for_entry(
             calculation_data, all_material_prices, selected_tier_discounts,
             adjustment_percentage, multiples_value, prodcuts_an_for_entry
