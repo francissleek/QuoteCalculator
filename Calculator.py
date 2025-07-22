@@ -243,9 +243,10 @@ def calculate_all_prices_for_entry(calculation_data, all_material_prices, all_di
     for cust_type, data in customer_types_map.items():
         # Assemble the specific calc_data for this customer type
         specific_calc_data = calculation_data.copy()
+        print(f"ACTIVE BASE AMOUNT: {data['base']}")
+        print(f"CUSTOMER MAPPING: {customer_types_map}")
         specific_calc_data['active_base_amount'] = data['base']
         specific_calc_data['base_price_per_sqft'] = data['value']
-
         all_prices[cust_type] = calculate_entry_total(
             specific_calc_data,
             cust_type,
@@ -371,8 +372,8 @@ def render_expanded_layout(entry, i, total_sqft_order, multiples_value, multiple
         options_for_type = SPECIALTY_FINISHING.get(selected_type, {})
         finishing_price_per_unit = 0
         if selected_type == "Banner/Mesh" and "POCKET or HEMM AND GROMMETS EVERY 2'" in options_for_type:
-             dynamic_option_name, finishing_price_per_unit = get_banner_mesh_details(sqft_per_piece, options_for_type)
-             fc2.text_input("Finishing Option", value=dynamic_option_name, key=f"fin_opt_{entry['id']}", disabled=True)
+            dynamic_option_name, finishing_price_per_unit = get_banner_mesh_details(sqft_per_piece, options_for_type)
+            fc2.text_input("Finishing Option", value=dynamic_option_name, key=f"fin_opt_{entry['id']}", disabled=True)
         else:
             if list(options_for_type.keys()):
                 selected_option = fc2.selectbox("Finishing Option", options=list(options_for_type.keys()), key=f"fin_opt_{entry['id']}")
@@ -551,6 +552,7 @@ def render_expanded_layout(entry, i, total_sqft_order, multiples_value, multiple
         else:
             prodcuts_an_for_entry = default_prodcuts_an
 
+        print(f"")
         entry_prices = calculate_all_prices_for_entry(
             calculation_data, all_material_prices, selected_tier_discounts,
             adjustment_percentage, multiples_value, prodcuts_an_for_entry
