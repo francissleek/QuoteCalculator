@@ -5,6 +5,10 @@ import json
 import math
 import os
 from collections import Counter
+from modules.config_loader import load_config
+from modules.calculations import calculate_material_price
+from modules.helpers import get_discount_tier_details, get_multiplier
+
 os.environ.setdefault('TERM', 'xterm')
 # --- Page Configuration (BEST PRACTICE FIX: Must be the first st command) ---
 st.set_page_config(layout="wide", page_title="Quote Calculator")
@@ -39,23 +43,6 @@ st.markdown("""
 
 
 st.title("Quote Calculator")
-
-# --- CONFIGURATION LOADER ---
-def load_config(file_path='config.json'):
-    try:
-        if "config" in st.secrets:
-            return json.loads(st.secrets["config"])
-    except (st.errors.StreamlitAPIException, KeyError, json.JSONDecodeError):
-        pass
-    try:
-        with open(file_path, 'r', encoding='utf-8') as f:
-            return json.load(f)
-    except FileNotFoundError:
-        st.error(f"FATAL: Configuration could not be loaded. Ensure 'config.json' exists.")
-        st.stop()
-    except json.JSONDecodeError as e:
-        st.error(f"FATAL: Error decoding '{file_path}'. Please ensure it is valid JSON. Error: {e}")
-        st.stop()
 
 if 'config' not in st.session_state:
     st.session_state.config = load_config()
@@ -120,35 +107,6 @@ def calculate_dynamic_prodcuts_an(vars, Q_Quantity):
     AO = (AX_Sq_material * AQ_SQ) + AS_Laminate_Loading + AT_Labour
     AN = AO + (form_response_bx8 / Q_Quantity) + AS_Laminate_Loading
     return AO, AN
-
-# --- Helper functions ---
-def excel_floor(number, significance):
-    if significance == 0: return 0
-    return math.floor(number / significance) * significance
-
-def excel_ceiling(number, significance):
-    if significance == 0: return 0
-    return math.ceil(number / significance) * significance
-
-def calculate_material_price(material_data):
-    results = {'preferred_base': 0, 'preferred_value': 0, 'corporate_base': 0, 'corporate_value': 0, 'wholesale_base': 0, 'wholesale_value': 0}
-    try:
-        p_vars = material_data['Preferred']
-        p_base = excel_floor(p_vars.get('preferred_historical_price', 0) * p_vars.get('preferred_fine_tune_modifier', 0), FALL_BACK_VALUE)
-        results['preferred_base'] = p_base
-        results['preferred_value'] = p_base * (1 - p_vars.get('preferred_discount_value', 0))
-
-        c_vars = material_data['Corporate']
-        c_base = excel_ceiling(p_base * c_vars.get('corporate_historical_price', 0), FALL_BACK_VALUE)
-        results['corporate_base'] = c_base
-        results['corporate_value'] = c_base * (1 - c_vars.get('corporate_discount_value', 0))
-
-        w_vars = material_data['Wholesale']
-        w_base = excel_ceiling(p_base * w_vars.get('wholesale_historical_price', 0), FALL_BACK_VALUE)
-        results['wholesale_base'] = w_base
-        results['wholesale_value'] = w_base * (1 - w_vars.get('wholesale_discount_value', 0))
-    except (KeyError, TypeError): pass
-    return results
 
 def get_discount_tier_details(total_sqft, all_tiers):
     best_tier_desc = "N/A"
@@ -383,13 +341,13 @@ def render_expanded_layout(entry, i, total_sqft_order, multiples_value, multiple
         metric_col1.metric(label="SQ'/piece", value=f"{sqft_per_piece:.2f}")
         metric_col2.metric(label="Total SQ'", value=f"{total_sqft_entry:.2f}")
 
-        # st.markdown("---")
-        # st.write("Base Amount per SQ' (Before Volume Discounts)")
-        # pref_col, corp_col, whole_col = st.columns(3)
-        # pref_col.metric(label="Preferred Base", value=f"${all_material_prices.get('preferred_base', 0):.2f}")
-        # corp_col.metric(label="Corporate Base", value=f"${all_material_prices.get('corporate_base', 0):.2f}")
-        # whole_col.metric(label="Wholesale Base", value=f"${all_material_prices.get('wholesale_base', 0):.2f}")
-        # st.divider()
+        st.markdown("---")
+        st.write("Base Amount per SQ' (Before Volume Discounts)")
+        pref_col, corp_col, whole_col = st.columns(3)
+        pref_col.metric(label="Preferred Base", value=f"${all_material_prices.get('preferred_base', 0):.2f}")
+        corp_col.metric(label="Corporate Base", value=f"${all_material_prices.get('corporate_base', 0):.2f}")
+        whole_col.metric(label="Wholesale Base", value=f"${all_material_prices.get('wholesale_base', 0):.2f}")
+        st.divider()
 
         sc1, sc2, sc3 = st.columns([1, 2, 3])
         sidedness_index = SIDEDNESS_OPTIONS.index(entry.get('sidedness', SIDEDNESS_OPTIONS[0]))
