@@ -562,22 +562,13 @@ def render_expanded_layout(entry, i, total_sqft_order, multiples_value, multiple
         corporate_label = f"Corporate ({selected_tier_discounts[1]:.2%})"
         wholesale_label = f"Wholesale ({selected_tier_discounts[2]:.2%})"
 
-        # --- NEW: Secondary Price Calculation ---
-        if sqft_per_piece > 0 and qty > 0:
-            price_per_sqft_pref = (entry_prices.get('Preferred', 0) / (sqft_per_piece * qty)) * qty
-            price_per_sqft_corp = (entry_prices.get('Corporate', 0) / (sqft_per_piece * qty)) * qty
-            price_per_sqft_whole = (entry_prices.get('Wholesale', 0) / (sqft_per_piece * qty)) * qty
-        else:
-            price_per_sqft_pref, price_per_sqft_corp, price_per_sqft_whole = 0, 0, 0
-
-
         p_col, c_col, w_col = st.columns(3)
         with p_col:
-            st.metric(label=preferred_label, value=f"${entry_prices.get('Preferred', 0):,.2f}/{price_per_sqft_pref:,.2f} per sq'")
+            st.metric(label=preferred_label, value=f"${entry_prices.get('Preferred', 0):,.2f}")
         with c_col:
-            st.metric(label=corporate_label, value=f"${entry_prices.get('Corporate', 0):,.2f}/{price_per_sqft_corp:,.2f} per sq'")
+            st.metric(label=corporate_label, value=f"${entry_prices.get('Corporate', 0):,.2f}")
         with w_col:
-            st.metric(label=wholesale_label, value=f"${entry_prices.get('Wholesale', 0):,.2f}/{price_per_sqft_whole:,.2f} per sq'")
+            st.metric(label=wholesale_label, value=f"${entry_prices.get('Wholesale', 0):,.2f}")
 
         return "ok", export_data
 
