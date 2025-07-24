@@ -333,10 +333,12 @@ def render_expanded_layout(entry, i, total_sqft_order, multiples_value, multiple
 
         material_data = {}
         all_material_prices = {}
+        is_commodity = False # Default value
         if entry.get('material'):
             material_data = MATERIALS.get(entry['type'], {}).get(entry['material'], {})
             if material_data:
                 all_material_prices = calculate_material_price(material_data)
+                is_commodity = material_data.get('is_commodity', False) # Get the commodity flag
 
         metric_col1, metric_col2, _ = st.columns(3)
         metric_col1.metric(label="SQ'/piece", value=f"{sqft_per_piece:.2f}")
@@ -498,7 +500,14 @@ def render_expanded_layout(entry, i, total_sqft_order, multiples_value, multiple
                 return f"{name} ({value:+.2%})"
 
             options = list(PRINT_ADJUSTMENT_FIXED.keys())
-            default_adj = entry.get('print_adjustment', options[0])
+            
+            # If the material is not a commodity, force the selection to the first option and disable.
+            if not is_commodity:
+                default_adj = options[0]
+                entry['print_adjustment'] = default_adj
+            else:
+                default_adj = entry.get('print_adjustment', options[0])
+
             adj_index = options.index(default_adj) if default_adj in options else 0
 
             selected_adjustment_label = st.selectbox(
@@ -506,7 +515,8 @@ def render_expanded_layout(entry, i, total_sqft_order, multiples_value, multiple
                 options=options,
                 index=adj_index,
                 format_func=format_adjustment_option,
-                key=f"adjustment_{entry['id']}"
+                key=f"adjustment_{entry['id']}",
+                disabled=not is_commodity # Disable if not a commodity
             )
             entry['print_adjustment'] = selected_adjustment_label
             adjustment_percentage = PRINT_ADJUSTMENT_FIXED[selected_adjustment_label]

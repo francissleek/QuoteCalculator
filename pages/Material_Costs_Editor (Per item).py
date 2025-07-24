@@ -51,6 +51,13 @@ if selected_type and selected_material_name:
     st.header(f"2. Edit Variables for: {selected_material_name}")
 
     material_data = config['MATERIALS'][selected_type][selected_material_name]
+
+    # --- NEW: Commodity Checkbox ---
+    is_commodity = st.checkbox(
+        "Is Commodity? (Enables Print Adjustments in Calculator)",
+        value=material_data.get("is_commodity", False),
+        key=f"{selected_material_name}_is_commodity"
+    )
     
     # Add the new tab for 'AN Formula Vars'
     pref_tab, corp_tab, wholesale_tab, an_formula_tab = st.tabs(["Preferred", "Corporate", "Wholesale", "AN Formula Vars"])
@@ -95,6 +102,9 @@ if selected_type and selected_material_name:
     save_col, reload_col = st.columns(2)
     with save_col:
         if st.button("Save Changes to Configuration File", use_container_width=True):
+            # --- SAVE COMMODITY FLAG ---
+            config['MATERIALS'][selected_type][selected_material_name]['is_commodity'] = is_commodity
+
             # Update the config dictionary in session state with the new values
             config['MATERIALS'][selected_type][selected_material_name]['Preferred']['preferred_historical_price'] = preferred_historical_price
             config['MATERIALS'][selected_type][selected_material_name]['Preferred']['preferred_fine_tune_modifier'] = preferred_fine_tune_modifier

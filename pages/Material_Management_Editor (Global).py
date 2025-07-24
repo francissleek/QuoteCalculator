@@ -92,6 +92,7 @@ if selected_type:
             else:
                 # Define the default structure for a new material
                 default_structure = {
+                    "is_commodity": False, # Set default value for the new flag
                     "Preferred": {
                         "preferred_historical_price": 0.0,
                         "preferred_fine_tune_modifier": 1.0,
